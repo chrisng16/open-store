@@ -1,0 +1,186 @@
+{
+  "itemPage": {
+    "itemHeader": {
+      "id": "28792873666",
+      "name": "Fried Chicken Egg Rolls",
+      "imgUrl": "https://img.cdn4dd.com/cdn-cgi/image/fit=contain,width=1200,height=672,format=auto/https://doordash-static.s3.amazonaws.com/media/photosV2/7b523603-741a-4c46-af9d-c8273debecf9-retina-large.jpeg",
+      "description": "Golden egg rolls filled with savory chicken. Served with house-made fish sauce and pickled veggies on a bed of lettuce.",
+      "unitAmount": 0,
+      "currency": "USD",
+      "decimalPlaces": 2,
+      "dietaryTagsList": [],
+      "__typename": "ItemHeader"
+    },
+    "optionLists": [
+    {
+      "_comment": "single_select — user must pick exactly one option (e.g. quantity tier)",
+      "id": "10071894645",
+      "name": "Egg Roll Quantity",
+      "subtitle": "Select 1",
+      "selectionNode": "single_select",
+      "minNumOptions": 1,
+      "maxNumOptions": 1,
+      "minAggregateOptionsQuantity": null,
+      "maxAggregateOptionsQuantity": null,
+      "minOptionChoiceQuantity": null,
+      "maxOptionChoiceQuantity": null,
+      "isOptional": false,
+      "options": [
+        {
+          "id": "45742167753",
+          "name": "2 Rolls",
+          "unitAmount": 995,
+          "currency": "USD",
+          "displayString": "+$9.95",
+          "decimalPlaces": 2,
+          "defaultQuantity": 0,
+          "dietaryTagsList": [],
+          "minOptionChoiceQuantity": null,
+          "maxOptionChoiceQuantity": null,
+          "__typename": "FeedOption"
+        },
+        {
+          "id": "45742167754",
+          "name": "4 Rolls",
+          "unitAmount": 1750,
+          "currency": "USD",
+          "displayString": "+$17.50",
+          "decimalPlaces": 2,
+          "defaultQuantity": 0,
+          "dietaryTagsList": [],
+          "minOptionChoiceQuantity": null,
+          "maxOptionChoiceQuantity": null,
+          "__typename": "FeedOption"
+        }
+      ],
+      "__typename": "OptionList"
+    },
+    {
+      "_comment": "multi_select — user may pick zero or more options up to a max (e.g. modifiers)",
+      "id": "10071894644",
+      "name": "Egg Roll Mods",
+      "subtitle": "Select up to 1",
+      "selectionNode": "multi_select",
+      "minNumOptions": 0,
+      "maxNumOptions": 1,
+      "minAggregateOptionsQuantity": null,
+      "maxAggregateOptionsQuantity": null,
+      "minOptionChoiceQuantity": null,
+      "maxOptionChoiceQuantity": null,
+      "isOptional": true,
+      "options": [
+        {
+          "id": "45742167749",
+          "name": "No Pickled Veggies",
+          "unitAmount": 0,
+          "currency": "USD",
+          "displayString": "",
+          "decimalPlaces": 2,
+          "defaultQuantity": 0,
+          "dietaryTagsList": [],
+          "minOptionChoiceQuantity": null,
+          "maxOptionChoiceQuantity": null,
+          "__typename": "FeedOption"
+        },
+        {
+          "id": "45742167751",
+          "name": "Sub Sweet Chili Sauce",
+          "unitAmount": 0,
+          "currency": "USD",
+          "displayString": "",
+          "decimalPlaces": 2,
+          "defaultQuantity": 0,
+          "dietaryTagsList": [],
+          "minOptionChoiceQuantity": null,
+          "maxOptionChoiceQuantity": null,
+          "__typename": "FeedOption"
+        },
+        {
+          "id": "45742167752",
+          "name": "Extra Fish Sauce",
+          "unitAmount": 0,
+          "currency": "USD",
+          "displayString": "",
+          "decimalPlaces": 2,
+          "defaultQuantity": 0,
+          "dietaryTagsList": [],
+          "minOptionChoiceQuantity": null,
+          "maxOptionChoiceQuantity": null,
+          "__typename": "FeedOption"
+        }
+      ],
+      "__typename": "OptionList"
+    },
+    {
+      "_comment": "aggregate_quantity — user distributes a fixed total quantity across options using steppers (e.g. pick 2 sides, can double up on one)",
+      "id": "1746960287",
+      "name": "Step 1",
+      "subtitle": "Select at least 1",
+      "selectionNode": "aggregate_quantity",
+      "minNumOptions": 1,
+      "maxNumOptions": 2,
+      "minAggregateOptionsQuantity": 2,
+      "maxAggregateOptionsQuantity": 2,
+      "minOptionChoiceQuantity": null,
+      "maxOptionChoiceQuantity": null,
+      "isOptional": false,
+      "options": [
+        {
+          "id": "11700675979",
+          "name": "White Steamed Rice",
+          "unitAmount": 0,
+          "currency": "USD",
+          "displayString": "",
+          "decimalPlaces": 2,
+          "defaultQuantity": 0,
+          "dietaryTagsList": [],
+          "minOptionChoiceQuantity": 1,
+          "maxOptionChoiceQuantity": 2,
+          "__typename": "FeedOption"
+        },
+        {
+          "id": "11700675978",
+          "name": "Fried Rice",
+          "unitAmount": 0,
+          "currency": "USD",
+          "displayString": "",
+          "decimalPlaces": 2,
+          "defaultQuantity": 0,
+          "dietaryTagsList": [],
+          "minOptionChoiceQuantity": 1,
+          "maxOptionChoiceQuantity": 2,
+          "__typename": "FeedOption"
+        },
+        {
+          "id": "11700675977",
+          "name": "Chow Mein",
+          "unitAmount": 0,
+          "currency": "USD",
+          "displayString": "",
+          "decimalPlaces": 2,
+          "defaultQuantity": 0,
+          "dietaryTagsList": [],
+          "minOptionChoiceQuantity": 1,
+          "maxOptionChoiceQuantity": 2,
+          "__typename": "FeedOption"
+        },
+        {
+          "id": "11700675980",
+          "name": "Super Greens",
+          "unitAmount": 0,
+          "currency": "USD",
+          "displayString": "",
+          "decimalPlaces": 2,
+          "defaultQuantity": 0,
+          "dietaryTagsList": [],
+          "minOptionChoiceQuantity": 1,
+          "maxOptionChoiceQuantity": 2,
+          "__typename": "FeedOption"
+        }
+      ],
+      "__typename": "OptionList"
+    }
+  ],
+    "__typename": "ItemPage"
+  }
+}

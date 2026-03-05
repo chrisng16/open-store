@@ -1,0 +1,18 @@
+{
+  "name": "open-store",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant food ordering platform with AI menu ingestion",
+  "scripts": {
+    "dev": "concurrently \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev:api": "cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:web": "cd frontend && pnpm dev",
+    "build:web": "cd frontend && pnpm build",
+    "lint": "cd frontend && pnpm lint",
+    "db:migrate": "cd backend && alembic upgrade head",
+    "db:revision": "cd backend && alembic revision --autogenerate -m"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

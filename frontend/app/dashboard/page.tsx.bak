@@ -1,0 +1,106 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { createClient } from "@/lib/supabase/client";
+import { ExternalLink, Plus, Store } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+type StoreInfo = {
+    id: string;
+    name: string;
+    slug: string;
+    is_active: boolean;
+};
+
+export default function DashboardPage() {
+    const [stores, setStores] = useState<StoreInfo[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function load() {
+            const supabase = createClient();
+            const token = (await supabase.auth.getSession()).data.session
+                ?.access_token;
+            if (!token) return;
+
+            try {
+                const res = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/stores/`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (res.ok) setStores(await res.json());
+            } catch {
+                // ignore
+            }
+            setLoading(false);
+        }
+        load();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="p-8">
+                <div className="animate-pulse text-muted-foreground">Loading stores...</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-8">
+            <div className="mb-6 flex items-center justify-between">
+                <h1 className="text-2xl font-bold">Your Stores</h1>
+                <Link href="/dashboard/store/new">
+                    <Button>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create Store
+                    </Button>
+                </Link>
+            </div>
+
+            {stores.length === 0 ? (
+                <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-16">
+                        <Store className="mb-4 h-12 w-12 text-muted-foreground" />
+                        <h2 className="text-lg font-semibold">No stores yet</h2>
+                        <p className="mt-1 text-muted-foreground">
+                            Create your first store to start selling
+                        </p>
+                        <Link href="/dashboard/store/new">
+                            <Button className="mt-4">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create Store
+                            </Button>
+                        </Link>
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {stores.map((store) => (
+                        <Link key={store.id} href={`/dashboard/${store.id}`}>
+                            <Card className="cursor-pointer transition-shadow hover:shadow-md">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between">
+                                        <span className="truncate">{store.name}</span>
+                                        {!store.is_active && (
+                                            <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                                Inactive
+                                            </span>
+                                        )}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <ExternalLink className="h-3 w-3" />
+                                        /store/{store.slug}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
