@@ -60,7 +60,9 @@ export const api = {
         create: (data: unknown, token: string) =>
             request("/stores", { method: "POST", body: data, token }),
         getBySlug: (slug: string) =>
-            request(`/stores/${slug}`),
+            request(`/stores/slug/${slug}`),
+        getById: (storeId: string) =>
+            request(`/stores/${storeId}`),
         update: (storeId: string, data: unknown, token: string) =>
             request(`/stores/${storeId}`, { method: "PATCH", body: data, token }),
         listMine: (token: string) =>

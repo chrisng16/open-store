@@ -3,19 +3,19 @@ export type ProductCategoryOption = {
     name: string;
 };
 
-export type ProductModifierFormData = {
+export type ProductOptionFormData = {
     name: string;
-    priceAdjustment: string;
+    unitAmount: string;
     isDefault: boolean;
     sortOrder: number;
 };
 
-export type ProductModifierGroupFormData = {
+export type ProductOptionListFormData = {
     name: string;
-    minSelections: number;
-    maxSelections: number;
-    isRequired: boolean;
-    modifiers: ProductModifierFormData[];
+    minNumOptions: number;
+    maxNumOptions: number;
+    isOptional: boolean;
+    options: ProductOptionFormData[];
 };
 
 export type ProductFormData = {
@@ -26,5 +26,5 @@ export type ProductFormData = {
     imageUrl: string;
     categoryId: string;
     categoryName: string;
-    modifierGroups: ProductModifierGroupFormData[];
+    optionLists: ProductOptionListFormData[];
 };

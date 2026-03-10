@@ -73,12 +73,15 @@ def upgrade() -> None:
     sa.Column('store_id', sa.UUID(), nullable=False),
     sa.Column('uploaded_by', sa.UUID(), nullable=False),
     sa.Column('file_url', sa.String(length=500), nullable=False),
+    sa.Column('file_size_bytes', sa.Integer(), nullable=True),
     sa.Column('file_type', sa.Enum('pdf', 'image', 'csv', 'xlsx', name='filetype'), nullable=False),
     sa.Column('status', sa.Enum('uploading', 'processing', 'review', 'published', 'failed', name='importstatus'), nullable=False),
     sa.Column('raw_extraction', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('parsed_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('confidence_scores', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('error_log', sa.Text(), nullable=True),
+    sa.Column('processing_started_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('ingested_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('published_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -91,9 +94,11 @@ def upgrade() -> None:
     sa.Column('store_id', sa.UUID(), nullable=False),
     sa.Column('customer_id', sa.UUID(), nullable=True),
     sa.Column('status', sa.Enum('pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled', name='orderstatus'), nullable=False),
-    sa.Column('subtotal', sa.Numeric(precision=10, scale=2), nullable=False),
-    sa.Column('tax', sa.Numeric(precision=10, scale=2), nullable=False),
-    sa.Column('total', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('subtotal_amount', sa.Integer(), nullable=False),
+    sa.Column('tax_amount', sa.Integer(), nullable=False),
+    sa.Column('total_amount', sa.Integer(), nullable=False),
+    sa.Column('currency', sa.String(length=3), nullable=False),
+    sa.Column('decimal_places', sa.Integer(), nullable=False),
     sa.Column('stripe_payment_intent_id', sa.String(length=255), nullable=True),
     sa.Column('customer_name', sa.String(length=255), nullable=True),
     sa.Column('customer_email', sa.String(length=255), nullable=True),
@@ -124,7 +129,9 @@ def upgrade() -> None:
     sa.Column('category_id', sa.UUID(), nullable=True),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('base_price', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('unit_amount', sa.Integer(), nullable=False),
+    sa.Column('currency', sa.String(length=3), nullable=False),
+    sa.Column('decimal_places', sa.Integer(), nullable=False),
     sa.Column('image_url', sa.String(length=500), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('sort_order', sa.Integer(), nullable=False),
@@ -144,8 +151,8 @@ def upgrade() -> None:
     sa.Column('category_name', sa.String(length=255), nullable=True),
     sa.Column('item_name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('price', sa.Float(), nullable=True),
-    sa.Column('modifiers', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('unit_amount', sa.Integer(), nullable=True),
+    sa.Column('option_lists', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('dietary_tags', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('allergens', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('confidence', sa.Float(), nullable=False),
@@ -158,12 +165,16 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['menu_import_id'], ['menu_imports.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('modifier_groups',
+    op.create_table('option_lists',
     sa.Column('product_id', sa.UUID(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('min_selections', sa.Integer(), nullable=False),
-    sa.Column('max_selections', sa.Integer(), nullable=False),
-    sa.Column('is_required', sa.Boolean(), nullable=False),
+    sa.Column('selection_node', sa.String(length=32), nullable=False),
+    sa.Column('min_num_options', sa.Integer(), nullable=False),
+    sa.Column('max_num_options', sa.Integer(), nullable=False),
+    sa.Column('min_aggregate_options_quantity', sa.Integer(), nullable=False),
+    sa.Column('max_aggregate_options_quantity', sa.Integer(), nullable=False),
+    sa.Column('is_optional', sa.Boolean(), nullable=False),
+    sa.Column('sort_order', sa.Integer(), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -175,8 +186,8 @@ def upgrade() -> None:
     sa.Column('product_id', sa.UUID(), nullable=True),
     sa.Column('product_name', sa.String(length=255), nullable=False),
     sa.Column('quantity', sa.Integer(), nullable=False),
-    sa.Column('unit_price', sa.Numeric(precision=10, scale=2), nullable=False),
-    sa.Column('total_price', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('unit_amount', sa.Integer(), nullable=False),
+    sa.Column('total_amount', sa.Integer(), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -184,27 +195,33 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('modifiers',
-    sa.Column('modifier_group_id', sa.UUID(), nullable=False),
+    op.create_table('options',
+    sa.Column('option_list_id', sa.UUID(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('price_adjustment', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('unit_amount', sa.Integer(), nullable=False),
+    sa.Column('currency', sa.String(length=3), nullable=False),
+    sa.Column('decimal_places', sa.Integer(), nullable=False),
+    sa.Column('min_option_choice_quantity', sa.Integer(), nullable=False),
+    sa.Column('max_option_choice_quantity', sa.Integer(), nullable=False),
+    sa.Column('default_quantity', sa.Integer(), nullable=False),
     sa.Column('is_default', sa.Boolean(), nullable=False),
     sa.Column('sort_order', sa.Integer(), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['modifier_group_id'], ['modifier_groups.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['option_list_id'], ['option_lists.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('order_item_modifiers',
+    op.create_table('order_item_options',
     sa.Column('order_item_id', sa.UUID(), nullable=False),
-    sa.Column('modifier_id', sa.UUID(), nullable=True),
-    sa.Column('modifier_name', sa.String(length=255), nullable=False),
-    sa.Column('price_adjustment', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('option_id', sa.UUID(), nullable=True),
+    sa.Column('option_name', sa.String(length=255), nullable=False),
+    sa.Column('unit_amount', sa.Integer(), nullable=False),
+    sa.Column('quantity', sa.Integer(), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['modifier_id'], ['modifiers.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['option_id'], ['options.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['order_item_id'], ['order_items.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -213,10 +230,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_table('order_item_modifiers')
-    op.drop_table('modifiers')
+    op.drop_table('order_item_options')
+    op.drop_table('options')
     op.drop_table('order_items')
-    op.drop_table('modifier_groups')
+    op.drop_table('option_lists')
     op.drop_table('menu_import_items')
     op.drop_index(op.f('ix_products_store_id'), table_name='products')
     op.drop_table('products')

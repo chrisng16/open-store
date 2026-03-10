@@ -110,7 +110,7 @@ export function CreateStoreSidebar({ ...props }: React.ComponentProps<typeof Sid
 
             <SidebarContent className="pt-0">
                 <NavStores />
-                <NavSecondary items={data.navSecondary} className="mt-auto" />
+                <NavSecondary items={data.navSecondary} activeRoute={null} className="mt-auto" />
             </SidebarContent>
             <SidebarFooter>
                 <Button

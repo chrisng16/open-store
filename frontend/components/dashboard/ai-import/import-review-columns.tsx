@@ -36,11 +36,11 @@ export function createImportReviewColumns({
             cell: ({ row }) => <span className=" text-foreground">{row.original.categoryName || "—"}</span>,
         },
         {
-            accessorKey: "price",
+            accessorKey: "unitAmount",
             header: "Price",
             cell: ({ row }) => (
                 <span className=" text-foreground">
-                    {row.original.price != null ? `$${Number(row.original.price).toFixed(2)}` : "—"}
+                    {row.original.unitAmount != null ? `$${(Number(row.original.unitAmount) / 100).toFixed(2)}` : "—"}
                 </span>
             ),
         },
@@ -87,21 +87,21 @@ export function createImportReviewColumns({
             header: "Options",
             cell: ({ row }) => (
                 <div className="text-xs text-muted-foreground max-w-60">
-                    {row.original.modifiers?.groups && row.original.modifiers.groups.length > 0 ? (
-                        row.original.modifiers.groups.map((group, idx) => (
-                            <div key={`${group.groupName}-${idx}`} className="truncate">
-                                <span className="font-medium text-foreground">{group.groupName}</span>
+                    {row.original.optionLists?.optionLists && row.original.optionLists.optionLists.length > 0 ? (
+                        row.original.optionLists.optionLists.map((group, idx) => (
+                            <div key={`${group.name}-${idx}`} className="truncate">
+                                <span className="font-medium text-foreground">{group.name}</span>
                                 {group.options && group.options.length > 0 ? (
                                     <span>
                                         {": "}
                                         {group.options
                                             .map((option) => {
-                                                const adj = option.priceAdjustment ?? 0;
+                                                const adj = option.unitAmount ?? 0;
                                                 const suffix =
                                                     adj > 0
-                                                        ? ` (+$${adj.toFixed(2)})`
+                                                        ? ` (+$${(adj / 100).toFixed(2)})`
                                                         : adj < 0
-                                                            ? ` (-$${Math.abs(adj).toFixed(2)})`
+                                                            ? ` (-$${(Math.abs(adj) / 100).toFixed(2)})`
                                                             : "";
                                                 return `${option.name}${suffix}${option.isDefault ? " [default]" : ""}`;
                                             })

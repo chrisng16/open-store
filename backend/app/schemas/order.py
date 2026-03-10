@@ -1,24 +1,22 @@
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from pydantic import BaseModel, Field
 from app.models.order import OrderStatus
 
 
-# --- Order creation ---
-
-class OrderItemModifierCreate(BaseModel):
-    modifier_id: uuid.UUID
-    modifier_name: str
-    price_adjustment: Decimal
+class OrderItemOptionCreate(BaseModel):
+    option_id: uuid.UUID
+    option_name: str
+    unit_amount: int = Field(default=0, ge=0)
+    quantity: int = Field(default=1, ge=1)
 
 
 class OrderItemCreate(BaseModel):
     product_id: uuid.UUID
     product_name: str
     quantity: int = Field(..., ge=1)
-    unit_price: Decimal
-    modifiers: list[OrderItemModifierCreate] = []
+    unit_amount: int = Field(..., ge=0)
+    options: list[OrderItemOptionCreate] = []
 
 
 class OrderCreate(BaseModel):
@@ -29,13 +27,12 @@ class OrderCreate(BaseModel):
     items: list[OrderItemCreate] = Field(..., min_length=1)
 
 
-# --- Order response ---
-
-class OrderItemModifierResponse(BaseModel):
+class OrderItemOptionResponse(BaseModel):
     id: uuid.UUID
-    modifier_id: uuid.UUID | None
-    modifier_name: str
-    price_adjustment: Decimal
+    option_id: uuid.UUID | None
+    option_name: str
+    unit_amount: int
+    quantity: int
 
     model_config = {"from_attributes": True}
 
@@ -45,9 +42,9 @@ class OrderItemResponse(BaseModel):
     product_id: uuid.UUID | None
     product_name: str
     quantity: int
-    unit_price: Decimal
-    total_price: Decimal
-    modifiers: list[OrderItemModifierResponse] = []
+    unit_amount: int
+    total_amount: int
+    options: list[OrderItemOptionResponse] = []
 
     model_config = {"from_attributes": True}
 
@@ -57,9 +54,11 @@ class OrderResponse(BaseModel):
     store_id: uuid.UUID
     customer_id: uuid.UUID | None
     status: OrderStatus
-    subtotal: Decimal
-    tax: Decimal
-    total: Decimal
+    subtotal_amount: int
+    tax_amount: int
+    total_amount: int
+    currency: str
+    decimal_places: int
     stripe_payment_intent_id: str | None
     customer_name: str | None
     customer_email: str | None

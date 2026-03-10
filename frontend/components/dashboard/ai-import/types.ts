@@ -2,19 +2,20 @@ export type ImportItem = {
     id: string;
     itemName: string;
     description: string | null;
-    price: number | null;
+    unitAmount: number | null;
     categoryName: string | null;
     confidence: number | null;
     status: string;
-    modifiers: {
-        groups?: {
-            groupName: string;
-            minSelections?: number;
-            maxSelections?: number;
-            isRequired?: boolean;
+    optionLists: {
+        optionLists?: {
+            name: string;
+            selectionNode?: string;
+            minNumOptions?: number;
+            maxNumOptions?: number;
+            isOptional?: boolean;
             options?: {
                 name: string;
-                priceAdjustment?: number;
+                unitAmount?: number;
                 isDefault?: boolean;
             }[];
         }[];
@@ -25,7 +26,24 @@ export type ImportItem = {
 export type MenuImportDetail = {
     id: string;
     fileUrl: string;
+    fileSizeBytes: number | null;
+    fileSizeMb: number | null;
     status: string;
+    createdAt: string;
+    processingStartedAt: string | null;
+    ingestedAt: string | null;
+    ingestDurationSeconds: number | null;
+    processingElapsedSeconds: number | null;
+    aiProcessingSeconds: number | null;
+    aiSecondsPerMb: number | null;
+    aiMbPerSecond: number | null;
+    parsedData?: {
+        ingestionMeta?: {
+            parser?: string | null;
+            model?: string | null;
+            promptVersion?: string | null;
+        };
+    } | null;
     items: ImportItem[];
 };
 
@@ -39,7 +57,7 @@ export type ItemDraft = {
     price: string;
     category: string;
     description: string;
-    modifiers: ImportItem["modifiers"];
+    optionLists: ImportItem["optionLists"];
     status: string;
 };
 

@@ -1,5 +1,4 @@
 import uuid
-from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +14,7 @@ from app.api.deps import (
     StoreContext,
 )
 from app.models.store import MemberRole
-from app.models.order import Order, OrderItem, OrderItemModifier, OrderStatus
+from app.models.order import Order, OrderItem, OrderItemOption, OrderStatus
 from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
 
 router = APIRouter(prefix="/stores/{store_id}", tags=["orders"])
@@ -35,33 +34,35 @@ async def create_order(
     next_order_number = (result.scalar() or 0) + 1
 
     # Calculate totals
-    subtotal = Decimal("0.00")
+    subtotal_amount = 0
     order_items = []
     for item_data in data.items:
-        item_total = item_data.unit_price * item_data.quantity
-        modifier_total = sum(m.price_adjustment for m in item_data.modifiers) * item_data.quantity
-        item_total += modifier_total
-        subtotal += item_total
+        item_total = item_data.unit_amount * item_data.quantity
+        option_total = sum(o.unit_amount * o.quantity for o in item_data.options) * item_data.quantity
+        item_total += option_total
+        subtotal_amount += item_total
 
         order_item = OrderItem(
             product_id=item_data.product_id,
             product_name=item_data.product_name,
             quantity=item_data.quantity,
-            unit_price=item_data.unit_price,
-            total_price=item_total,
+            unit_amount=item_data.unit_amount,
+            total_amount=item_total,
         )
-        order_items.append((order_item, item_data.modifiers))
+        order_items.append((order_item, item_data.options))
 
-    tax = (subtotal * Decimal("0.08")).quantize(Decimal("0.01"))  # 8% default tax
-    total = subtotal + tax
+    tax_amount = round(subtotal_amount * 0.08)
+    total_amount = subtotal_amount + tax_amount
 
     order = Order(
         store_id=store_id,
         customer_id=user.id if user else None,
         status=OrderStatus.pending,
-        subtotal=subtotal,
-        tax=tax,
-        total=total,
+        subtotal_amount=subtotal_amount,
+        tax_amount=tax_amount,
+        total_amount=total_amount,
+        currency="USD",
+        decimal_places=2,
         customer_name=data.customer_name,
         customer_email=data.customer_email,
         customer_phone=data.customer_phone,
@@ -71,19 +72,20 @@ async def create_order(
     db.add(order)
     await db.flush()
 
-    for order_item, modifier_data_list in order_items:
+    for order_item, option_data_list in order_items:
         order_item.order_id = order.id
         db.add(order_item)
         await db.flush()
 
-        for mod_data in modifier_data_list:
-            mod = OrderItemModifier(
+        for option_data in option_data_list:
+            option = OrderItemOption(
                 order_item_id=order_item.id,
-                modifier_id=mod_data.modifier_id,
-                modifier_name=mod_data.modifier_name,
-                price_adjustment=mod_data.price_adjustment,
+                option_id=option_data.option_id,
+                option_name=option_data.option_name,
+                unit_amount=option_data.unit_amount,
+                quantity=option_data.quantity,
             )
-            db.add(mod)
+            db.add(option)
 
     await db.flush()
 
@@ -91,7 +93,7 @@ async def create_order(
     result = await db.execute(
         select(Order)
         .where(Order.id == order.id)
-        .options(selectinload(Order.items).selectinload(OrderItem.modifiers))
+        .options(selectinload(Order.items).selectinload(OrderItem.options))
     )
     return result.scalar_one()
 
@@ -107,7 +109,7 @@ async def list_orders(
     query = (
         select(Order)
         .where(Order.store_id == ctx.store.id)
-        .options(selectinload(Order.items).selectinload(OrderItem.modifiers))
+        .options(selectinload(Order.items).selectinload(OrderItem.options))
         .order_by(Order.created_at.desc())
         .limit(limit)
         .offset(offset)
@@ -127,7 +129,7 @@ async def get_order(
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.store_id == store_id)
-        .options(selectinload(Order.items).selectinload(OrderItem.modifiers))
+        .options(selectinload(Order.items).selectinload(OrderItem.options))
     )
     order = result.scalar_one_or_none()
     if not order:
@@ -145,7 +147,7 @@ async def update_order_status(
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.store_id == ctx.store.id)
-        .options(selectinload(Order.items).selectinload(OrderItem.modifiers))
+        .options(selectinload(Order.items).selectinload(OrderItem.options))
     )
     order = result.scalar_one_or_none()
     if not order:

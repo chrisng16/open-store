@@ -32,7 +32,7 @@ export function useImportReviewState({ importData, categoryOptions }: UseImportR
     const isDraftDirty = useCallback((item: ImportItem, draft?: ItemDraft): boolean => {
         if (!draft) return false;
         const serverCategory = item.categoryName || "";
-        const serverPrice = item.price == null ? null : Number(item.price);
+        const serverPrice = item.unitAmount == null ? null : Number(item.unitAmount) / 100;
         const draftPrice = parseDraftPrice(draft.price);
 
         return (
@@ -40,7 +40,7 @@ export function useImportReviewState({ importData, categoryOptions }: UseImportR
             draft.category !== serverCategory ||
             draftPrice !== serverPrice ||
             draft.description !== (item.description || "") ||
-            !modifiersEqual(draft.modifiers, item.modifiers) ||
+            !modifiersEqual(draft.optionLists, item.optionLists) ||
             draft.status !== item.status
         );
     }, []);
@@ -49,10 +49,10 @@ export function useImportReviewState({ importData, categoryOptions }: UseImportR
         (item: ImportItem): ItemDraft =>
             drafts[item.id] || {
                 name: item.itemName,
-                price: String(item.price ?? ""),
+                price: item.unitAmount == null ? "" : String(Number(item.unitAmount) / 100),
                 category: item.categoryName || "",
                 description: item.description || "",
-                modifiers: cloneModifiers(item.modifiers),
+                optionLists: cloneModifiers(item.optionLists),
                 status: item.status,
             },
         [drafts]
@@ -71,10 +71,10 @@ export function useImportReviewState({ importData, categoryOptions }: UseImportR
             for (const item of importData.items) {
                 next[item.id] = {
                     name: item.itemName,
-                    price: String(item.price ?? ""),
+                    price: item.unitAmount == null ? "" : String(Number(item.unitAmount) / 100),
                     category: item.categoryName || "",
                     description: item.description || "",
-                    modifiers: cloneModifiers(item.modifiers),
+                    optionLists: cloneModifiers(item.optionLists),
                     status: item.status,
                 };
             }
@@ -113,7 +113,7 @@ export function useImportReviewState({ importData, categoryOptions }: UseImportR
                 price: "",
                 category: "",
                 description: "",
-                modifiers: null,
+                optionLists: null,
                 status: "pending",
             };
             return {
@@ -132,8 +132,8 @@ export function useImportReviewState({ importData, categoryOptions }: UseImportR
                 itemName: draft.name,
                 description: draft.description || null,
                 categoryName: draft.category || null,
-                price: parseDraftPrice(draft.price),
-                modifiers: cloneModifiers(draft.modifiers),
+                unitAmount: draft.price.trim() ? Math.round((parseDraftPrice(draft.price) ?? 0) * 100) : null,
+                optionLists: cloneModifiers(draft.optionLists),
                 status: draft.status,
             };
         });

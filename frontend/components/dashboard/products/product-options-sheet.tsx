@@ -22,7 +22,7 @@ export function ProductOptionsSheet({
     onFormDataChange,
     onClose,
 }: ProductOptionsSheetProps) {
-
+    console.log("Rendering ProductOptionsSheet with formData:", formData);
     return (
         <aside
             className={`min-h-0 flex h-full flex-col bg-background-elevated lg:border-l`}
@@ -50,17 +50,17 @@ export function ProductOptionsSheet({
                             onClick={() =>
                                 onFormDataChange({
                                     ...formData,
-                                    modifierGroups: [
-                                        ...formData.modifierGroups,
+                                    optionLists: [
+                                        ...formData.optionLists,
                                         {
                                             name: "",
-                                            minSelections: 0,
-                                            maxSelections: 1,
-                                            isRequired: false,
-                                            modifiers: [
+                                            minNumOptions: 0,
+                                            maxNumOptions: 1,
+                                            isOptional: true,
+                                            options: [
                                                 {
                                                     name: "",
-                                                    priceAdjustment: "0",
+                                                    unitAmount: "0",
                                                     isDefault: false,
                                                     sortOrder: 0,
                                                 },
@@ -76,15 +76,15 @@ export function ProductOptionsSheet({
                     </div>
                 </div>
 
-                {formData.modifierGroups.length === 0 ? (
+                {formData.optionLists.length === 0 ? (
                     <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
                         No groups yet. Add one to let customers customize this product.
                     </div>
                 ) : (
-                    formData.modifierGroups.map((group, groupIndex) => (
-                        <div key={groupIndex} className="rounded-md border p-3">
+                    formData.optionLists.map((optionList, optionListIndex) => (
+                        <div key={optionListIndex} className="rounded-md border p-3">
                             <div className="mb-3 flex items-center justify-between">
-                                <p className="font-medium">{group.name || `Group ${groupIndex + 1}`}</p>
+                                <p className="font-medium">{optionList.name || `Group ${optionListIndex + 1}`}</p>
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -92,7 +92,7 @@ export function ProductOptionsSheet({
                                     onClick={() =>
                                         onFormDataChange({
                                             ...formData,
-                                            modifierGroups: formData.modifierGroups.filter((_, index) => index !== groupIndex),
+                                            optionLists: formData.optionLists.filter((_, index) => index !== optionListIndex),
                                         })
                                     }
                                 >
@@ -104,34 +104,34 @@ export function ProductOptionsSheet({
                                 <div className="space-y-1 md:col-span-3">
                                     <Label>Group Name</Label>
                                     <Input
-                                        value={group.name}
+                                        value={optionList.name}
                                         onChange={(event) => {
-                                            const nextGroups = [...formData.modifierGroups];
-                                            nextGroups[groupIndex] = { ...group, name: event.target.value };
-                                            onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                            const nextOptionLists = [...formData.optionLists];
+                                            nextOptionLists[optionListIndex] = { ...optionList, name: event.target.value };
+                                            onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                         }}
                                         placeholder="e.g. Size"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label>Min Selections</Label>
+                                    <Label>Min Options</Label>
                                     <Input
                                         type="number"
                                         min="0"
-                                        value={group.minSelections}
+                                        value={optionList.minNumOptions}
                                         onChange={(event) => {
-                                            const nextGroups = [...formData.modifierGroups];
-                                            nextGroups[groupIndex] = {
-                                                ...group,
-                                                minSelections: Number(event.target.value || 0),
+                                            const nextOptionLists = [...formData.optionLists];
+                                            nextOptionLists[optionListIndex] = {
+                                                ...optionList,
+                                                minNumOptions: Number(event.target.value || 0),
                                             };
-                                            onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                            onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                         }}
                                     />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-1">
-                                        <Label>Max Selections</Label>
+                                        <Label>Max Options</Label>
                                         <TooltipProvider>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
@@ -146,31 +146,31 @@ export function ProductOptionsSheet({
                                     <Input
                                         type="number"
                                         min="0"
-                                        value={group.maxSelections}
+                                        value={optionList.maxNumOptions}
                                         onChange={(event) => {
-                                            const nextGroups = [...formData.modifierGroups];
-                                            nextGroups[groupIndex] = {
-                                                ...group,
-                                                maxSelections: Number(event.target.value || 0),
+                                            const nextOptionLists = [...formData.optionLists];
+                                            nextOptionLists[optionListIndex] = {
+                                                ...optionList,
+                                                maxNumOptions: Number(event.target.value || 0),
                                             };
-                                            onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                            onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                         }}
                                     />
                                 </div>
                                 <div className="flex items-end">
                                     <label className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <Checkbox
-                                            checked={group.isRequired}
+                                            checked={!optionList.isOptional}
                                             onCheckedChange={(checked) => {
-                                                const nextGroups = [...formData.modifierGroups];
-                                                nextGroups[groupIndex] = {
-                                                    ...group,
-                                                    isRequired: checked === true,
+                                                const nextOptionLists = [...formData.optionLists];
+                                                nextOptionLists[optionListIndex] = {
+                                                    ...optionList,
+                                                    isOptional: checked !== true,
                                                 };
-                                                onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                                onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                             }}
                                         />
-                                        Required Group
+                                        Required List
                                     </label>
                                 </div>
                             </div>
@@ -183,21 +183,21 @@ export function ProductOptionsSheet({
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => {
-                                            const nextGroups = [...formData.modifierGroups];
-                                            const targetGroup = nextGroups[groupIndex];
-                                            nextGroups[groupIndex] = {
-                                                ...targetGroup,
-                                                modifiers: [
-                                                    ...targetGroup.modifiers,
+                                            const nextOptionLists = [...formData.optionLists];
+                                            const targetOptionList = nextOptionLists[optionListIndex];
+                                            nextOptionLists[optionListIndex] = {
+                                                ...targetOptionList,
+                                                options: [
+                                                    ...targetOptionList.options,
                                                     {
                                                         name: "",
-                                                        priceAdjustment: "0",
+                                                        unitAmount: "0",
                                                         isDefault: false,
-                                                        sortOrder: targetGroup.modifiers.length,
+                                                        sortOrder: targetOptionList.options.length,
                                                     },
                                                 ],
                                             };
-                                            onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                            onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                         }}
                                     >
                                         <Plus className="size-4" />
@@ -206,7 +206,7 @@ export function ProductOptionsSheet({
                                 </div>
 
                                 <div className="p-1 md:border border-dashed border-0 rounded-md md:space-y-2 space-y-2">
-                                    {group.modifiers.length > 0 ? <div className="hidden grid-cols-12 gap-2 px-2 text-xs text-muted-foreground md:grid">
+                                    {optionList.options.length > 0 ? <div className="hidden grid-cols-12 gap-2 px-2 text-xs text-muted-foreground md:grid">
                                         <Label className="md:col-span-5 text-xs text-muted-foreground">Option Name</Label>
                                         <Label className="md:col-span-3 text-xs text-muted-foreground">Price Adj.</Label>
                                         <Label className="md:col-span-2 text-xs text-muted-foreground">Sort</Label>
@@ -215,22 +215,22 @@ export function ProductOptionsSheet({
                                     </div> :
                                         <div className="p-2 text-muted-foreground text-sm">No options yet. Add one to let customers customize this group.</div>}
 
-                                    {group.modifiers.map((modifier, modifierIndex) => (
-                                        <div key={modifierIndex} className="grid grid-cols-1 gap-2 p-2 rounded-md md:p-0.5 md:grid-cols-12 border border-dashed md:border-0">
+                                    {optionList.options.map((option, optionIndex) => (
+                                        <div key={optionIndex} className="grid grid-cols-1 gap-2 p-2 rounded-md md:p-0.5 md:grid-cols-12 border border-dashed md:border-0">
                                             <div className="md:col-span-5">
                                                 <Label className="mb-1 block text-xs text-muted-foreground md:hidden">Option Name</Label>
                                                 <Input
-                                                    value={modifier.name}
+                                                    value={option.name}
                                                     placeholder="Option name"
                                                     onChange={(event) => {
-                                                        const nextGroups = [...formData.modifierGroups];
-                                                        const nextModifiers = [...group.modifiers];
-                                                        nextModifiers[modifierIndex] = {
-                                                            ...modifier,
+                                                        const nextOptionLists = [...formData.optionLists];
+                                                        const nextOptions = [...optionList.options];
+                                                        nextOptions[optionIndex] = {
+                                                            ...option,
                                                             name: event.target.value,
                                                         };
-                                                        nextGroups[groupIndex] = { ...group, modifiers: nextModifiers };
-                                                        onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                                        nextOptionLists[optionListIndex] = { ...optionList, options: nextOptions };
+                                                        onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                                     }}
                                                 />
                                             </div>
@@ -239,17 +239,17 @@ export function ProductOptionsSheet({
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={modifier.priceAdjustment}
+                                                    value={option.unitAmount}
                                                     placeholder="0.00"
                                                     onChange={(event) => {
-                                                        const nextGroups = [...formData.modifierGroups];
-                                                        const nextModifiers = [...group.modifiers];
-                                                        nextModifiers[modifierIndex] = {
-                                                            ...modifier,
-                                                            priceAdjustment: event.target.value,
+                                                        const nextOptionLists = [...formData.optionLists];
+                                                        const nextOptions = [...optionList.options];
+                                                        nextOptions[optionIndex] = {
+                                                            ...option,
+                                                            unitAmount: event.target.value,
                                                         };
-                                                        nextGroups[groupIndex] = { ...group, modifiers: nextModifiers };
-                                                        onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                                        nextOptionLists[optionListIndex] = { ...optionList, options: nextOptions };
+                                                        onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                                     }}
                                                 />
                                             </div>
@@ -258,32 +258,32 @@ export function ProductOptionsSheet({
                                                 <Input
                                                     type="number"
                                                     min="0"
-                                                    value={modifier.sortOrder}
+                                                    value={option.sortOrder}
                                                     onChange={(event) => {
-                                                        const nextGroups = [...formData.modifierGroups];
-                                                        const nextModifiers = [...group.modifiers];
-                                                        nextModifiers[modifierIndex] = {
-                                                            ...modifier,
+                                                        const nextOptionLists = [...formData.optionLists];
+                                                        const nextOptions = [...optionList.options];
+                                                        nextOptions[optionIndex] = {
+                                                            ...option,
                                                             sortOrder: Number(event.target.value || 0),
                                                         };
-                                                        nextGroups[groupIndex] = { ...group, modifiers: nextModifiers };
-                                                        onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                                        nextOptionLists[optionListIndex] = { ...optionList, options: nextOptions };
+                                                        onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                                     }}
                                                 />
                                             </div>
                                             <div className="flex items-center justify-start md:justify-center gap-2 md:col-span-1">
                                                 <Label className="text-xs text-muted-foreground md:hidden">Default</Label>
                                                 <Checkbox
-                                                    checked={modifier.isDefault}
+                                                    checked={option.isDefault}
                                                     onCheckedChange={(checked) => {
-                                                        const nextGroups = [...formData.modifierGroups];
-                                                        const nextModifiers = [...group.modifiers];
-                                                        nextModifiers[modifierIndex] = {
-                                                            ...modifier,
+                                                        const nextOptionLists = [...formData.optionLists];
+                                                        const nextOptions = [...optionList.options];
+                                                        nextOptions[optionIndex] = {
+                                                            ...option,
                                                             isDefault: checked === true,
                                                         };
-                                                        nextGroups[groupIndex] = { ...group, modifiers: nextModifiers };
-                                                        onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                                        nextOptionLists[optionListIndex] = { ...optionList, options: nextOptions };
+                                                        onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                                     }}
                                                 />
                                             </div>
@@ -293,10 +293,10 @@ export function ProductOptionsSheet({
                                                     variant="ghost"
                                                     size="icon-sm"
                                                     onClick={() => {
-                                                        const nextGroups = [...formData.modifierGroups];
-                                                        const nextModifiers = group.modifiers.filter((_, index) => index !== modifierIndex);
-                                                        nextGroups[groupIndex] = { ...group, modifiers: nextModifiers };
-                                                        onFormDataChange({ ...formData, modifierGroups: nextGroups });
+                                                        const nextOptionLists = [...formData.optionLists];
+                                                        const nextOptions = optionList.options.filter((_, index) => index !== optionIndex);
+                                                        nextOptionLists[optionListIndex] = { ...optionList, options: nextOptions };
+                                                        onFormDataChange({ ...formData, optionLists: nextOptionLists });
                                                     }}
                                                 >
                                                     <Trash2 className="size-4 text-destructive" />

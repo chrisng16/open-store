@@ -24,7 +24,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { use, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { memo, use, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 
 const ProductEditorDialog = dynamic(
@@ -34,6 +34,63 @@ const ProductEditorDialog = dynamic(
         ),
     { ssr: false }
 );
+
+const DEFAULT_AI_SECONDS_PER_MB = 150 * 0.85; // 150 seconds per MB with a 15% reduction based on observed performance improvements, resulting in 127.5 seconds per MB
+const DEFAULT_ESTIMATED_DURATION_LABEL = "0 minutes 35 seconds";
+
+type ImportDurationEstimateSource = Pick<
+    MenuImportDetail,
+    "fileSizeMb" | "fileSizeBytes"
+>;
+
+function getPredictedTotalSeconds(data?: ImportDurationEstimateSource): number | null {
+    if (!data) return null;
+    const fileSizeMb =
+        data.fileSizeMb ??
+        (typeof data.fileSizeBytes === "number" ? data.fileSizeBytes / (1024 * 1024) : null);
+    if (!fileSizeMb || fileSizeMb <= 0) return null;
+
+    const aiSecondsPerMb = DEFAULT_AI_SECONDS_PER_MB;
+
+    if (!Number.isFinite(aiSecondsPerMb) || aiSecondsPerMb <= 0) return null;
+    return Math.max(1, Math.round(fileSizeMb * aiSecondsPerMb));
+}
+
+function formatMinutesSeconds(totalSeconds: number): string {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (minutes === 0) return `${seconds} seconds`;
+    return `${minutes} minutes ${seconds} seconds`;
+}
+
+function buildImportDurationEstimate(data?: ImportDurationEstimateSource) {
+    const predictedTotalSeconds = getPredictedTotalSeconds(data);
+
+    return {
+        predictedTotalSeconds,
+        estimatedDurationLabel: predictedTotalSeconds
+            ? formatMinutesSeconds(predictedTotalSeconds)
+            : DEFAULT_ESTIMATED_DURATION_LABEL,
+    };
+}
+
+const ImportProcessingCard = memo(function ImportProcessingCard({
+    estimatedDurationLabel,
+}: {
+    estimatedDurationLabel: string;
+}) {
+    return (
+        <div className="p-6">
+            <Card>
+                <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center text-muted-foreground">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <p className="text-base font-medium text-foreground">AI is processing your menu</p>
+                    <p className="text-sm">This import will take approximately {estimatedDurationLabel}.</p>
+                </CardContent>
+            </Card>
+        </div>
+    );
+});
 
 export default function ImportReviewPage({
     params,
@@ -56,11 +113,38 @@ export default function ImportReviewPage({
             ),
         enabled: !!storeId && !!importId,
         refetchInterval: (query) => {
-            const status = (query.state.data as MenuImportDetail | undefined)?.status;
-            if (status === "processing" || status === "uploading") return 2000;
+            const data = query.state.data as MenuImportDetail | undefined;
+            const status = data?.status;
+            if (status === "processing" || status === "uploading") {
+                const createdAtMs = data?.createdAt ? new Date(data.createdAt).getTime() : NaN;
+                const { predictedTotalSeconds } = buildImportDurationEstimate(data);
+
+                const predictedTotalMs = predictedTotalSeconds ? predictedTotalSeconds * 1000 : 35000;
+                const elapsedMs = Number.isNaN(createdAtMs) ? predictedTotalMs : Date.now() - createdAtMs;
+                if (elapsedMs < predictedTotalMs) {
+                    return Math.max(1000, predictedTotalMs - elapsedMs);
+                }
+                return 2000;
+            }
             return false;
         },
     });
+
+    const processingEstimate = useMemo(
+        () =>
+            buildImportDurationEstimate(
+                importData
+                    ? {
+                        fileSizeMb: importData.fileSizeMb,
+                        fileSizeBytes: importData.fileSizeBytes,
+                    }
+                    : undefined
+            ),
+        [
+            importData?.fileSizeMb,
+            importData?.fileSizeBytes,
+        ]
+    );
 
     const { data: categories = [] } = useQuery({
         queryKey: ["menu-import-dialog-categories", storeId],
@@ -118,8 +202,8 @@ export default function ImportReviewPage({
                         itemName: draft.name,
                         categoryName: draft.category || null,
                         description: draft.description || null,
-                        price: parseDraftPrice(draft.price),
-                        modifiers: draft.modifiers,
+                        unitAmount: draft.price.trim() ? Math.round((parseDraftPrice(draft.price) ?? 0) * 100) : null,
+                        optionLists: draft.optionLists,
                         status: draft.status,
                     };
                 });
@@ -170,8 +254,10 @@ export default function ImportReviewPage({
                             itemName: params.formData.name,
                             categoryName: categoryName || null,
                             description: description || null,
-                            price: parseDraftPrice(params.formData.basePrice),
-                            modifiers: nextModifiers,
+                            unitAmount: params.formData.basePrice.trim()
+                                ? Math.round((parseDraftPrice(params.formData.basePrice) ?? 0) * 100)
+                                : null,
+                            optionLists: nextModifiers,
                             status: nextStatus,
                         })
                     ),
@@ -185,7 +271,7 @@ export default function ImportReviewPage({
                     price: params.formData.basePrice,
                     category: categoryName,
                     description,
-                    modifiers: cloneModifiers(nextModifiers),
+                    optionLists: cloneModifiers(nextModifiers),
                     status: nextStatus,
                 },
             };
@@ -320,17 +406,7 @@ export default function ImportReviewPage({
         return <div className="p-6 text-destructive">Import not found</div>;
 
     if (importData.status === "processing" || importData.status === "uploading") {
-        return (
-            <div className="p-6">
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center text-muted-foreground">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                        <p className="text-base font-medium text-foreground">AI is processing your menu</p>
-                        <p className="text-sm">This screen updates automatically and will show review once extraction is complete.</p>
-                    </CardContent>
-                </Card>
-            </div>
-        );
+        return <ImportProcessingCard estimatedDurationLabel={processingEstimate.estimatedDurationLabel} />;
     }
 
     return (
@@ -338,6 +414,20 @@ export default function ImportReviewPage({
             <ImportReviewHeader
                 status={importData.status}
                 fileUrl={importData.fileUrl}
+                fileSizeBytes={importData.fileSizeBytes}
+                fileSizeMb={importData.fileSizeMb}
+                createdAt={importData.createdAt}
+                showIngestInfo={true}
+                processingStartedAt={importData.processingStartedAt}
+                ingestedAt={importData.ingestedAt}
+                ingestDurationSeconds={importData.ingestDurationSeconds}
+                processingElapsedSeconds={importData.processingElapsedSeconds}
+                aiProcessingSeconds={importData.aiProcessingSeconds}
+                aiSecondsPerMb={importData.aiSecondsPerMb}
+                aiMbPerSecond={importData.aiMbPerSecond}
+                parser={importData.parsedData?.ingestionMeta?.parser ?? null}
+                model={importData.parsedData?.ingestionMeta?.model ?? null}
+                promptVersion={importData.parsedData?.ingestionMeta?.promptVersion ?? null}
                 isPublished={isPublished}
                 hasDirtyChanges={hasDirtyChanges}
                 acceptedCount={acceptedItems.length}

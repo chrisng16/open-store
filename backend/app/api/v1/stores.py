@@ -68,6 +68,8 @@ async def get_store_by_slug(
         .options(selectinload(Store.business_hour_entries))
         .where(Store.slug == slug, Store.is_active == True)
     )
+
+    print("Executed query for slug:", slug)  # Debug log
     store = result.scalar_one_or_none()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")

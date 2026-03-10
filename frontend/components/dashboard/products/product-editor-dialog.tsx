@@ -42,10 +42,10 @@ export function ProductEditorDialog({
     }, [open]);
 
     useEffect(() => {
-        if (open && formData.modifierGroups.length > 0) {
+        if (open && formData.optionLists.length > 0) {
             setIsOptionsOpen(true);
         }
-    }, [open, formData.modifierGroups.length]);
+    }, [open, formData.optionLists.length]);
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -116,7 +116,7 @@ export function ProductEditorDialog({
 export type {
     ProductCategoryOption,
     ProductFormData,
-    ProductModifierFormData,
-    ProductModifierGroupFormData
+    ProductOptionFormData,
+    ProductOptionListFormData
 } from "@/components/dashboard/products/product-editor-types";
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { CartButton } from "@/components/store/cart-button";
 import { ProductDialog } from "@/components/store/product-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useMenuScrollSpy } from "@/hooks/use-menu-scroll-spy";
@@ -7,7 +8,6 @@ import { useCartStore } from "@/lib/cart-store";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 
 type Option = {
     id: string;
@@ -81,14 +81,14 @@ function TabBar({
     };
 
     return (
-        <div className="relative flex items-end border-b">
+        <div className="relative">
             {/* Left arrow */}
             <button
                 type="button"
                 onClick={() => scrollBy("left")}
                 aria-hidden={!canScrollLeft}
                 className={cn(
-                    "absolute left-0 z-10 flex h-full items-center bg-linear-to-r from-background via-background via-70% to-transparent pl-1 pr-4 transition-opacity",
+                    "absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-border/70 bg-background/95 p-2 shadow-sm transition-all",
                     canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0",
                 )}
             >
@@ -98,7 +98,7 @@ function TabBar({
             {/* Scrollable tabs */}
             <div
                 ref={tabScrollerRef}
-                className="no-scrollbar flex flex-1 items-end gap-1 overflow-x-auto  overflow-y-hidden pointer-events-none px-4"
+                className="no-scrollbar flex flex-1 items-center gap-2 overflow-x-auto px-12 py-1"
             >
                 {sections.map((section) => (
                     <button
@@ -107,10 +107,10 @@ function TabBar({
                         type="button"
                         onClick={() => navigateTo(section.id)}
                         className={cn(
-                            "shrink-0 border-b-4 rounded px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors pointer-events-auto",
+                            "shrink-0 rounded-full border px-4 py-2 text-sm font-medium whitespace-nowrap transition-all",
                             activeSection === section.id
-                                ? "-mb-px border-foreground text-foreground"
-                                : "border-transparent text-muted-foreground hover:text-foreground",
+                                ? "border-foreground bg-card text-foreground shadow-sm"
+                                : "border-border/60 bg-background text-muted-foreground hover:border-border hover:text-foreground",
                         )}
                     >
                         {section.name}
@@ -124,7 +124,7 @@ function TabBar({
                 onClick={() => scrollBy("right")}
                 aria-hidden={!canScrollRight}
                 className={cn(
-                    "absolute right-0 z-10 flex h-full items-center bg-linear-to-l from-background via-background via-70% to-transparent pr-1 pl-4 transition-opacity",
+                    "absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-border/70 bg-background/95 p-2 shadow-sm transition-all",
                     canScrollRight ? "opacity-100" : "pointer-events-none opacity-0",
                 )}
             >
@@ -138,7 +138,7 @@ function TabBar({
 
 export function MenuBrowser({
     slug, storeName, storeDescription, sections, defaultCategory,
-    navbarHeight = 64,
+    navbarHeight = 0,
 }: {
     slug: string; storeName: string; storeDescription?: string | null;
     sections: CategorySection[]; defaultCategory: string;
@@ -147,11 +147,14 @@ export function MenuBrowser({
 }) {
     // Ref for the full inline store-info block (not sticky).
     const storeInfoRef = useRef<HTMLDivElement | null>(null);
-    // Ref for the sticky tab bar container.
+    // Ref for the compact sticky header that appears after scrolling past store info.
     const stickyHeaderRef = useRef<HTMLDivElement | null>(null);
     const tabScrollerRef = useRef<HTMLDivElement | null>(null);
     const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
     const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+    // Whether the user has scrolled past the inline store-info section.
+    const [pastStoreInfo, setPastStoreInfo] = useState(false);
 
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const setStoreSlug = useCartStore((s) => s.setStoreSlug);
@@ -162,7 +165,21 @@ export function MenuBrowser({
         [sections],
     );
 
-    // The sticky offset is navbarHeight + the reserved compact row slot + the sticky tab bar height + a small gap.
+    // Watch when the inline store-info block leaves the viewport.
+    useEffect(() => {
+        const el = storeInfoRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => setPastStoreInfo(!entry.isIntersecting),
+            { rootMargin: `-${navbarHeight}px 0px 0px 0px`, threshold: 0 },
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [navbarHeight]);
+
+    // The sticky offset is navbarHeight + the sticky block's own height + a small gap.
+    // navbarHeight accounts for the `top` value the sticky block sits at;
+    // offsetHeight measures the block itself (compact row + tab bar).
     const getStickyOffset = useCallback(
         () => navbarHeight + (stickyHeaderRef.current?.offsetHeight ?? 0) + 16,
         [navbarHeight],
@@ -178,7 +195,8 @@ export function MenuBrowser({
     });
 
     return (
-        <div className="container mx-auto px-4 py-3">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+
             {/* Product dialog */}
             {selectedProduct && (
                 <ProductDialog
@@ -220,16 +238,6 @@ export function MenuBrowser({
                             })),
                         }));
 
-                        toast.success(`Added ${qty} ${product.name} to cart`, {
-                            action: {
-                                label: "View cart",
-                                onClick: () => {
-                                    const cartUrl = `/store/${slug}/cart`;
-                                    window.location.href = cartUrl;
-                                },
-                            }
-                        });
-
                         setStoreSlug(slug);
                         addItem({
                             product_id: product.id,
@@ -245,46 +253,94 @@ export function MenuBrowser({
             )}
 
             {/* ── Inline store info (not sticky, scrolls away) ── */}
-            <div ref={storeInfoRef} className="flex flex-wrap items-start border border-border/70 justify-between gap-4 p-6 bg-card rounded-2xl mb-6">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight md:text-3xl">{storeName}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {storeDescription || "Playful bites, crafted fast for pickup."}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge variant="secondary">Pickup only</Badge>
-                        <Badge variant="outline">{totalItems} items</Badge>
-                        <Badge variant="outline">Ready in 15-25 min</Badge>
+            <div ref={storeInfoRef} className="py-6">
+                <div className="grid gap-5 rounded-[2rem] border border-border/70 bg-card p-6 shadow-[0_18px_48px_rgba(0,0,0,0.05)] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-end">
+                    <div className="space-y-5">
+                        <div className="space-y-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground" style={{ color: "var(--store-primary)" }}>
+                                Menu browser
+                            </p>
+                            <h2 className="text-3xl font-semibold tracking-[-0.04em] md:text-4xl">{storeName}</h2>
+                            <p className="max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+                                {storeDescription || "Browse the full menu by section, scan details quickly, and add items without losing your place."}
+                            </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary" className="rounded-full px-3 py-1">Pickup only</Badge>
+                            <Badge variant="outline" className="rounded-full px-3 py-1">{totalItems} items</Badge>
+                            <Badge variant="outline" className="rounded-full px-3 py-1">Built for fast ordering</Badge>
+                        </div>
+                    </div>
+                    <div className="flex w-full h-full items-start justify-end">
+                        <CartButton slug={slug} />
                     </div>
                 </div>
             </div>
 
-            {/* Sticky tab bar in a separate container below the compact nav slot */}
+            {/*
+             * ── Sticky header block ──
+             * Always mounted so refs are stable. Visibility controlled by
+             * translate so it doesn't affect layout when hidden.
+             *
+             * Structure mirrors DoorDash:
+             *   - Compact name row  → only visible after scrolling past store info
+             *   - Tab bar           → always visible once sticky
+             */}
             <div
                 ref={stickyHeaderRef}
-                className="sticky z-30 bg-background"
-                style={{ top: navbarHeight - 8 }}
+                className="sticky z-20 pt-3"
+                style={{ top: navbarHeight }}
             >
-                <TabBar
-                    sections={sections}
-                    activeSection={activeSection}
-                    navigateTo={navigateTo}
-                    tabScrollerRef={tabScrollerRef}
-                    tabButtonRefs={tabButtonRefs}
-                />
+                <div className="rounded-[1.75rem] border border-border/70 bg-background/95 p-3 shadow-sm backdrop-blur supports-backdrop-filter:bg-background/88">
+                    {/* Compact store name row — slides in after scrolling past inline header */}
+                    <div
+                        className={cn(
+                            "grid transition-all duration-200",
+                            pastStoreInfo ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                        )}
+                    >
+                        {/* Inner div must have overflow-visible so the cart badge isn't clipped */}
+                        <div className="overflow-visible">
+                            <div className="flex items-center justify-between gap-4 px-2 pb-3">
+                                <div>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Now browsing</p>
+                                    <h2 className="text-lg font-semibold tracking-tight">{storeName}</h2>
+                                </div>
+                                <CartButton slug={slug} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tab bar — always present in the sticky block */}
+                    <TabBar
+                        sections={sections}
+                        activeSection={activeSection}
+                        navigateTo={navigateTo}
+                        tabScrollerRef={tabScrollerRef}
+                        tabButtonRefs={tabButtonRefs}
+                    />
+                </div>
             </div>
 
             {/* ── Menu sections ── */}
-            <div className="space-y-10 pt-10">
+            <div className="space-y-12 pb-10 pt-8">
                 {sections.map((section) => (
                     <section
                         key={section.id}
                         ref={(node) => { sectionRefs.current[section.id] = node; }}
                     >
-                        <header className="mb-4">
-                            <h3 className="text-xl font-bold tracking-tight md:text-2xl">{section.name}</h3>
+                        <header className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                            <div>
+                                <h3 className="text-2xl font-semibold tracking-tight md:text-3xl">{section.name}</h3>
+                                {section.description && (
+                                    <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{section.description}</p>
+                                )}
+                            </div>
                             {section.description && (
-                                <p className="mt-0.5 text-sm text-muted-foreground">{section.description}</p>
+                                <p className="hidden text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground md:block">
+                                    {section.products.length} item{section.products.length === 1 ? "" : "s"}
+                                </p>
                             )}
                         </header>
 
@@ -313,10 +369,15 @@ export function MenuBrowser({
 function ProductCard({ product, onSelect }: { product: Product; onSelect: () => void }) {
     return (
         <button type="button" onClick={onSelect} className="group w-full text-left">
-            <div className="flex h-full items-stretch justify-between gap-3 rounded-xl border bg-card p-4 transition-shadow hover:shadow-md">
+            <div className="flex h-full items-stretch justify-between gap-4 rounded-[1.75rem] border border-border/70 bg-card p-4 shadow-[0_8px_24px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
                 <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
                     <div>
-                        <h4 className="font-semibold leading-snug tracking-tight">{product.name}</h4>
+                        <div className="mb-2 flex items-start justify-between gap-3">
+                            <h4 className="font-semibold leading-snug tracking-tight">{product.name}</h4>
+                            <div className="rounded-full border border-border/70 bg-background px-2 py-1 text-xs font-semibold">
+                                ${(Number(product.unit_amount) / 100).toFixed(2)}
+                            </div>
+                        </div>
                         {product.description && (
                             <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                                 {product.description}
@@ -324,9 +385,8 @@ function ProductCard({ product, onSelect }: { product: Product; onSelect: () => 
                         )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-bold">${(Number(product.unit_amount) / 100).toFixed(2)}</p>
                         {product.dietary_tags?.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
+                            <Badge key={tag} variant="secondary" className="rounded-full text-xs">
                                 {DIETARY_ICONS[tag] || ""} {tag}
                             </Badge>
                         ))}
@@ -334,19 +394,19 @@ function ProductCard({ product, onSelect }: { product: Product; onSelect: () => 
                 </div>
 
                 {product.image_url ? (
-                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg">
+                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-border/70">
                         <img
                             src={product.image_url}
                             alt={product.name}
                             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
-                        <div className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-background shadow">
+                        <div className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-border/70 bg-background shadow-sm">
                             <Plus className="h-3.5 w-3.5" />
                         </div>
                     </div>
                 ) : (
                     <div className="flex shrink-0 items-end">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-background shadow-sm">
                             <Plus className="h-3.5 w-3.5" />
                         </div>
                     </div>

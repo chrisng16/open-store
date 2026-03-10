@@ -18,14 +18,14 @@ type ProductDialogFormData = {
     imageUrl: string;
     categoryId: string;
     categoryName: string;
-    modifierGroups: {
+    optionLists: {
         name: string;
-        minSelections: number;
-        maxSelections: number;
-        isRequired: boolean;
-        modifiers: {
+        minNumOptions: number;
+        maxNumOptions: number;
+        isOptional: boolean;
+        options: {
             name: string;
-            priceAdjustment: string;
+            unitAmount: string;
             isDefault: boolean;
             sortOrder: number;
         }[];
@@ -63,7 +63,7 @@ export const emptyProductFormData: ProductDialogFormData = {
     imageUrl: "",
     categoryId: "",
     categoryName: "",
-    modifierGroups: [],
+    optionLists: [],
 };
 
 export const useUIStore = create<UIState>((set) => ({

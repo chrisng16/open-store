@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -512,7 +513,7 @@ function SidebarMenuButton({
   const Comp = asChild ? Slot.Root : "button"
   const { isMobile, state } = useSidebar()
 
-  const button = (
+  const buttonContent = (
     <Comp
       data-slot="sidebar-menu-button"
       data-sidebar="menu-button"
@@ -522,6 +523,8 @@ function SidebarMenuButton({
       {...props}
     />
   )
+
+  const button = isMobile ? <SheetClose asChild>{buttonContent}</SheetClose> : buttonContent
 
   if (!tooltip) {
     return button

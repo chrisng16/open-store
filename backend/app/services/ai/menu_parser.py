@@ -11,8 +11,12 @@ from dataclasses import dataclass
 
 from app.config import get_settings
 from app.models.menu_import import FileType
-from app.services.ai.schema import MenuExtractionResult, ExtractedMenuItem, ExtractedModifierGroup, ExtractedModifier
-from app.services.ai.prompts import MENU_EXTRACTION_SYSTEM_PROMPT, MENU_EXTRACTION_USER_PROMPT
+from app.services.ai.schema import MenuExtractionResult, ExtractedMenuItem, ExtractedOptionList, ExtractedOption
+from app.services.ai.prompts import (
+    MENU_EXTRACTION_SYSTEM_PROMPT,
+    MENU_EXTRACTION_USER_PROMPT,
+    MENU_EXTRACTION_PROMPT_VERSION,
+)
 from app.services.ai.validators import validate_extraction
 from app.services.storage import download_file
 
@@ -78,8 +82,9 @@ async def _parse_csv(file_content: bytes) -> MenuExtractionResult:
 
         try:
             price = float(price_str.replace("$", "").replace(",", "").strip())
+            unit_amount = round(price * 100)
         except (ValueError, AttributeError):
-            price = None
+            unit_amount = None
 
         if not name:
             continue
@@ -90,8 +95,8 @@ async def _parse_csv(file_content: bytes) -> MenuExtractionResult:
                 category_name=category,
                 item_name=name,
                 description=description,
-                price=price,
-                confidence=0.95 if price else 0.7,
+                unit_amount=unit_amount,
+                confidence=0.95 if unit_amount is not None else 0.7,
             )
         )
 
@@ -132,10 +137,11 @@ async def _parse_xlsx(file_content: bytes) -> MenuExtractionResult:
         category = str(row[cat_idx]).strip() if cat_idx is not None and row[cat_idx] else "Other"
         name = str(row[name_idx]).strip() if name_idx is not None and row[name_idx] else ""
         description = str(row[desc_idx]).strip() if desc_idx is not None and row[desc_idx] else None
-        price = None
+        unit_amount = None
         if price_idx is not None and row[price_idx]:
             try:
                 price = float(str(row[price_idx]).replace("$", "").replace(",", "").strip())
+                unit_amount = round(price * 100)
             except ValueError:
                 pass
 
@@ -148,8 +154,8 @@ async def _parse_xlsx(file_content: bytes) -> MenuExtractionResult:
                 category_name=category,
                 item_name=name,
                 description=description if description != "None" else None,
-                price=price,
-                confidence=0.95 if price else 0.7,
+                unit_amount=unit_amount,
+                confidence=0.95 if unit_amount is not None else 0.7,
             )
         )
 
@@ -160,6 +166,8 @@ async def parse_menu_file(file_url: str, file_type: FileType) -> ParseResult:
     """
     Main entry point: parse a menu file (from S3) and return validated structured data.
     """
+    settings = get_settings()
+
     # Download file from S3
     file_content = await download_file(file_url)
 
@@ -179,43 +187,60 @@ async def parse_menu_file(file_url: str, file_type: FileType) -> ParseResult:
     # Build parse result items for DB storage
     parsed_items = []
     for item in validated.items:
-        modifier_groups = []
-        for group_index, mg in enumerate(item.modifier_groups):
+        option_lists = []
+        for group_index, ol in enumerate(item.option_lists):
             options = []
-            for option_index, m in enumerate(mg.options):
+            for option_index, option in enumerate(ol.options):
                 options.append({
-                    "name": m.name,
-                    "price_adjustment": m.price_adjustment,
-                    "is_default": m.is_default,
-                    "sort_order": m.sort_order if m.sort_order is not None else option_index,
+                    "name": option.name,
+                    "unitAmount": option.unit_amount,
+                    "currency": option.currency,
+                    "decimalPlaces": option.decimal_places,
+                    "minOptionChoiceQuantity": option.min_option_choice_quantity,
+                    "maxOptionChoiceQuantity": option.max_option_choice_quantity,
+                    "defaultQuantity": option.default_quantity,
+                    "isDefault": option.is_default,
+                    "sortOrder": option.sort_order if option.sort_order is not None else option_index,
                 })
 
-            modifier_groups.append({
-                "group_name": mg.group_name,
-                "min_selections": mg.min_selections,
-                "max_selections": mg.max_selections,
-                "is_required": mg.is_required,
-                "sort_order": mg.sort_order if mg.sort_order is not None else group_index,
+            option_lists.append({
+                "name": ol.name,
+                "selectionNode": ol.selection_node,
+                "minNumOptions": ol.min_num_options,
+                "maxNumOptions": ol.max_num_options,
+                "minAggregateOptionsQuantity": ol.min_aggregate_options_quantity,
+                "maxAggregateOptionsQuantity": ol.max_aggregate_options_quantity,
+                "isOptional": ol.is_optional,
+                "sortOrder": ol.sort_order if ol.sort_order is not None else group_index,
                 "options": options,
             })
 
-        modifiers_payload = {"groups": modifier_groups} if modifier_groups else None
+        option_lists_payload = {"optionLists": option_lists} if option_lists else None
 
         parsed_items.append(
             type("ParsedItem", (), {
                 "category_name": item.category_name,
                 "item_name": item.item_name,
                 "description": item.description,
-                "price": item.price,
-                "modifiers": modifiers_payload,
+                "unit_amount": item.unit_amount,
+                "option_lists": option_lists_payload,
                 "dietary_tags": item.dietary_tags,
                 "allergens": item.allergens,
                 "confidence": item.confidence,
             })()
         )
 
+    parser_name = "gemini" if file_type in (FileType.pdf, FileType.image) else file_type.value
     return ParseResult(
         raw_data=validated.model_dump(),
-        parsed_data={"items_count": len(parsed_items), "categories": validated.categories},
+        parsed_data={
+            "items_count": len(parsed_items),
+            "categories": validated.categories,
+            "ingestion_meta": {
+                "parser": parser_name,
+                "model": settings.gemini_model if parser_name == "gemini" else None,
+                "prompt_version": MENU_EXTRACTION_PROMPT_VERSION if parser_name == "gemini" else None,
+            },
+        },
         items=parsed_items,
     )

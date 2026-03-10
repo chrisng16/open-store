@@ -1,7 +1,6 @@
 import uuid
 import enum
-from decimal import Decimal
-from sqlalchemy import String, Text, Integer, Numeric, ForeignKey, Enum
+from sqlalchemy import String, Text, Integer, ForeignKey, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import inspect
@@ -27,9 +26,11 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     status: Mapped[OrderStatus] = mapped_column(
         Enum(OrderStatus), nullable=False, default=OrderStatus.pending
     )
-    subtotal: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    tax: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
-    total: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    subtotal_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    tax_amount: Mapped[int] = mapped_column(Integer, default=0)
+    total_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
+    decimal_places: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     customer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -62,12 +63,12 @@ class OrderItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     product_name: Mapped[str] = mapped_column(String(255), nullable=False)  # Snapshot
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    total_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    unit_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_amount: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Relationships
     order: Mapped["Order"] = relationship(back_populates="items")
-    modifiers: Mapped[list["OrderItemModifier"]] = relationship(
+    options: Mapped[list["OrderItemOption"]] = relationship(
         back_populates="order_item", cascade="all, delete-orphan"
     )
 
@@ -81,28 +82,29 @@ class OrderItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         return f"<OrderItem id={identity}>"
 
 
-class OrderItemModifier(Base, UUIDPrimaryKeyMixin, TimestampMixin):
-    __tablename__ = "order_item_modifiers"
+class OrderItemOption(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "order_item_options"
 
     order_item_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("order_items.id", ondelete="CASCADE"), nullable=False
     )
-    modifier_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("modifiers.id", ondelete="SET NULL"), nullable=True
+    option_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("options.id", ondelete="SET NULL"), nullable=True
     )
-    modifier_name: Mapped[str] = mapped_column(String(255), nullable=False)  # Snapshot
-    price_adjustment: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
+    option_name: Mapped[str] = mapped_column(String(255), nullable=False)  # Snapshot
+    unit_amount: Mapped[int] = mapped_column(Integer, default=0)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     # Relationships
-    order_item: Mapped["OrderItem"] = relationship(back_populates="modifiers")
+    order_item: Mapped["OrderItem"] = relationship(back_populates="options")
 
     def __repr__(self) -> str:
         state = inspect(self)
-        modifier_name = state.dict.get("modifier_name")
-        if modifier_name is not None:
-            return f"<OrderItemModifier {modifier_name}>"
+        option_name = state.dict.get("option_name")
+        if option_name is not None:
+            return f"<OrderItemOption {option_name}>"
         identity = state.identity[0] if state.identity else None
-        return f"<OrderItemModifier id={identity}>"
+        return f"<OrderItemOption id={identity}>"
 
 
 # Avoid circular import

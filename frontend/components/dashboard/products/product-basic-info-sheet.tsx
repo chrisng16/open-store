@@ -152,7 +152,7 @@ export function ProductBasicInfoSheet({
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Open a second sheet to edit modifier groups and options.</p>
+                                    <p>Open a second sheet to edit option lists and options.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>

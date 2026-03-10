@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, FileUp, Menu, ShoppingBag } from "lucide-react";
+import { ExternalLink, FileUp, Package, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 
 interface StoreSubNavProps {
@@ -12,7 +12,7 @@ interface StoreSubNavProps {
 export default function StoreSubNav({ storeId, storeName, pending }: StoreSubNavProps) {
     const navItems = [
         { href: `/dashboard/${storeId}/orders`, label: "Orders", icon: ShoppingBag },
-        { href: `/dashboard/${storeId}/menu`, label: "Menu", icon: Menu },
+        { href: `/dashboard/${storeId}/products`, label: "Products", icon: Package },
         { href: `/dashboard/${storeId}/ai-import`, label: "AI Import", icon: FileUp },
     ];
     return (
@@ -24,7 +24,7 @@ export default function StoreSubNav({ storeId, storeName, pending }: StoreSubNav
                     }
                     {storeName && (
                         <Link
-                            href={`/store/${storeId}/menu`}
+                            href={`/store/${storeId}/products`}
                             target="_blank"
                             className="text-sm text-muted-foreground hover:text-foreground"
                         >

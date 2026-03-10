@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { denormalizeRequest } from "@/lib/normalize-response";
 import { uploadFileWithSignedUrl } from "@/lib/uploads";
@@ -114,7 +114,7 @@ export default function AIImportPage({
             <div className="p-6">
                 {/* Drag-drop zone */}
                 <Card
-                    className="mb-6 border-dashed"
+                    className="mb-6 border-dashed shadow-none"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={async (e) => {
                         e.preventDefault();
@@ -142,42 +142,48 @@ export default function AIImportPage({
                 ) : (
                     <div className="space-y-3">
                         {imports.map((imp) => (
-                            <Card key={imp.id} className="transition-shadow hover:shadow-md">
+                            <div
+                                key={imp.id}
+                                className="rounded-lg border bg-background-elevated-2 text-card-foreground shadow-sm transition-shadow hover:shadow-md overflow-hidden"
+                            >
                                 <Link
                                     href={`/dashboard/${storeId}/ai-import/${imp.id}`}
+                                    className="block p-4"
                                 >
-                                    <CardHeader>
-                                        <div className="flex items-center justify-between gap-3">
-                                            <CardTitle className="truncate text-sm font-medium">
+                                    <div className="flex items-center justify-between gap-3 w-full overflow-hidden">
+                                        {/* LEFT */}
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                            <Badge variant={statusVariant(imp.status)} className="h-4 text-xs shrink-0">
+                                                {imp.status}
+                                            </Badge>
+                                            <span className="text-sm font-medium truncate">
                                                 {getFileNameFromUrl(imp.fileUrl)}
-                                            </CardTitle>
-
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant={statusVariant(imp.status)}>
-                                                    {imp.status}
-                                                </Badge>
-
-                                                {(imp.status === "uploading" || imp.status === "failed") ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={processMutation.isPending}
-                                                        onClick={() => {
-                                                            processMutation.mutate(imp.id);
-                                                        }}
-                                                    >
-                                                        {processMutation.isPending ? (
-                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <Play className="mr-2 h-4 w-4" />
-                                                        )}
-                                                        Process
-                                                    </Button>
-                                                ) : null}
-                                            </div>
+                                            </span>
                                         </div>
-                                    </CardHeader>
-                                    <CardContent className="pt-0 text-sm text-muted-foreground">
+
+                                        {/* RIGHT */}
+                                        {(imp.status === "uploading" || imp.status === "failed") && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={processMutation.isPending}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    processMutation.mutate(imp.id);
+                                                }}
+                                                className="shrink-0"
+                                            >
+                                                {processMutation.isPending ? (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Play className="mr-2 h-4 w-4" />
+                                                )}
+                                                Process
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-1 text-sm text-muted-foreground">
                                         {Array.isArray(imp.items) && (
                                             <span>
                                                 {imp.items.filter((item) => item.status === "approved").length}/{imp.items.length} items accepted
@@ -185,9 +191,9 @@ export default function AIImportPage({
                                             </span>
                                         )}
                                         {new Date(imp.createdAt).toLocaleString()}
-                                    </CardContent>
+                                    </div>
                                 </Link>
-                            </Card>
+                            </div>
                         ))}
                     </div>
                 )}

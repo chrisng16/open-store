@@ -8,7 +8,7 @@ from app.models.menu_import import MenuImport, MenuImportItem, ImportStatus, Imp
 from app.schemas.menu_import import MenuImportItemUpdate
 from app.api.deps import StoreContext
 from app.api.v1.menu_imports import update_import_item, publish_menu_import
-from app.models.product import Product, ModifierGroup, Modifier
+from app.models.product import Product, OptionList, Option
 
 
 async def main() -> None:
@@ -36,18 +36,19 @@ async def main() -> None:
             category_name="Smoke",
             item_name=test_name_ok,
             description="approved item",
-            price=10.5,
-            modifiers={
-                "groups": [
+            unit_amount=1050,
+            option_lists={
+                "optionLists": [
                     {
-                        "group_name": "Size",
-                        "min_selections": 1,
-                        "max_selections": 1,
-                        "is_required": True,
-                        "sort_order": 0,
+                        "name": "Size",
+                        "selectionNode": "single_select",
+                        "minNumOptions": 1,
+                        "maxNumOptions": 1,
+                        "isOptional": False,
+                        "sortOrder": 0,
                         "options": [
-                            {"name": "Regular", "price_adjustment": 0, "is_default": True, "sort_order": 0},
-                            {"name": "Large", "price_adjustment": 2.0, "is_default": False, "sort_order": 1},
+                            {"name": "Regular", "unitAmount": 0, "isDefault": True, "sortOrder": 0},
+                            {"name": "Large", "unitAmount": 200, "isDefault": False, "sortOrder": 1},
                         ],
                     }
                 ]
@@ -60,7 +61,7 @@ async def main() -> None:
             category_name="Smoke",
             item_name=test_name_pending,
             description="pending item",
-            price=7.0,
+            unit_amount=700,
             confidence=0.8,
             status=ImportItemStatus.pending,
         )
@@ -74,7 +75,7 @@ async def main() -> None:
             item_id=pending_item.id,
             data=MenuImportItemUpdate(
                 item_name=f"{test_name_pending} Edited",
-                price=7.0,
+                unit_amount=700,
             ),
             ctx=ctx,
             db=db,
@@ -87,7 +88,7 @@ async def main() -> None:
             item_id=pending_item.id,
             data=MenuImportItemUpdate(
                 item_name=f"{test_name_pending} Edited",
-                price=7.0,
+                unit_amount=700,
                 status=ImportItemStatus.rejected,
             ),
             ctx=ctx,
@@ -112,27 +113,27 @@ async def main() -> None:
         assert f"{test_name_pending} Edited" not in created_names, "Rejected/edited item should not be published"
 
         approved_product = next(p for p in created_products if p.name == test_name_ok)
-        groups = (
-            await db.execute(select(ModifierGroup).where(ModifierGroup.product_id == approved_product.id))
+        lists = (
+            await db.execute(select(OptionList).where(OptionList.product_id == approved_product.id))
         ).scalars().all()
-        assert len(groups) == 1, f"Expected 1 modifier group, got {len(groups)}"
-        assert groups[0].name == "Size"
-        assert groups[0].min_selections == 1
-        assert groups[0].max_selections == 1
-        assert groups[0].is_required is True
+        assert len(lists) == 1, f"Expected 1 option list, got {len(lists)}"
+        assert lists[0].name == "Size"
+        assert lists[0].min_num_options == 1
+        assert lists[0].max_num_options == 1
+        assert lists[0].is_optional is False
 
         options = (
             await db.execute(
-                select(Modifier)
-                .where(Modifier.modifier_group_id == groups[0].id)
-                .order_by(Modifier.sort_order.asc())
+                select(Option)
+                .where(Option.option_list_id == lists[0].id)
+                .order_by(Option.sort_order.asc())
             )
         ).scalars().all()
-        assert [o.name for o in options] == ["Regular", "Large"], "Modifier option names mismatch"
+        assert [o.name for o in options] == ["Regular", "Large"], "Option names mismatch"
         assert options[0].is_default is True
 
         await db.rollback()
-        print("SMOKE PASS: update semantics, approved-only publish, and modifier persistence verified")
+        print("SMOKE PASS: update semantics, approved-only publish, and option list persistence verified")
 
 
 if __name__ == "__main__":

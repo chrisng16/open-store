@@ -8,6 +8,21 @@ import { getFileNameFromUrl } from "./utils";
 type ImportReviewHeaderProps = {
     status: string;
     fileUrl: string;
+    fileSizeBytes: number | null;
+    fileSizeMb: number | null;
+    createdAt: string;
+    processingStartedAt: string | null;
+    ingestedAt: string | null;
+    showIngestInfo?: boolean;
+
+    ingestDurationSeconds: number | null;
+    processingElapsedSeconds: number | null;
+    aiProcessingSeconds: number | null;
+    aiSecondsPerMb: number | null;
+    aiMbPerSecond: number | null;
+    parser: string | null;
+    model: string | null;
+    promptVersion: string | null;
     isPublished: boolean;
     hasDirtyChanges: boolean;
     acceptedCount: number;
@@ -20,6 +35,19 @@ type ImportReviewHeaderProps = {
 export function ImportReviewHeader({
     status,
     fileUrl,
+    fileSizeBytes,
+    fileSizeMb,
+    createdAt,
+    processingStartedAt,
+    ingestedAt,
+    ingestDurationSeconds,
+    processingElapsedSeconds,
+    aiProcessingSeconds,
+    aiSecondsPerMb,
+    aiMbPerSecond,
+    parser,
+    model,
+    promptVersion,
     isPublished,
     hasDirtyChanges,
     acceptedCount,
@@ -27,7 +55,18 @@ export function ImportReviewHeader({
     publishPending,
     onApply,
     onOpenPublishConfirm,
+    showIngestInfo = false,
 }: ImportReviewHeaderProps) {
+    const createdLabel = new Date(createdAt).toLocaleString();
+    const processingStartedLabel = processingStartedAt ? new Date(processingStartedAt).toLocaleString() : null;
+    const ingestedLabel = ingestedAt ? new Date(ingestedAt).toLocaleString() : null;
+
+    const fileSizeLabel = fileSizeMb != null
+        ? `${fileSizeMb.toFixed(2)} MB`
+        : fileSizeBytes != null
+            ? `${(fileSizeBytes / (1024 * 1024)).toFixed(2)} MB`
+            : null;
+
     return (
         <div className="sticky top-0 z-20 shrink-0">
             <div className="border-b rounded-t-md bg-background-elevated/70 backdrop-blur">
@@ -38,6 +77,26 @@ export function ImportReviewHeader({
                             <h1 className="text-xl font-semibold">Review Import</h1>
                         </div>
                         <p className="text-sm text-muted-foreground truncate">{getFileNameFromUrl(fileUrl)}</p>
+                        {showIngestInfo && (
+                            <>
+                                <p className="text-xs text-muted-foreground">
+                                    Created: {createdLabel}
+                                    {processingStartedLabel ? ` · AI Start: ${processingStartedLabel}` : ""}
+                                    {ingestedLabel ? ` · Ingested: ${ingestedLabel}` : ""}
+                                    {fileSizeLabel ? ` · File: ${fileSizeLabel}` : ""}
+                                    {ingestDurationSeconds != null ? ` · Ingest: ${ingestDurationSeconds}s` : ""}
+                                    {processingElapsedSeconds != null ? ` · Processing: ${processingElapsedSeconds}s` : ""}
+                                    {aiProcessingSeconds != null ? ` · AI Processing: ${aiProcessingSeconds}s` : ""}
+                                    {aiSecondsPerMb != null ? ` · AI sec/MB: ${aiSecondsPerMb.toFixed(2)}` : ""}
+                                    {aiMbPerSecond != null ? ` · AI MB/s: ${aiMbPerSecond.toFixed(3)}` : ""}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Parser: {parser || "n/a"}
+                                    {model ? ` · Model: ${model}` : ""}
+                                    {promptVersion ? ` · Prompt: ${promptVersion}` : ""}
+                                </p>
+                            </>
+                        )}
                     </div>
                     {isPublished ? (
                         <p className="text-xs text-muted-foreground">This import is published and locked.</p>

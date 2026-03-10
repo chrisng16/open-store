@@ -29,6 +29,8 @@ async def process_menu_import_task(ctx: dict, import_id: str) -> dict:
             return {"error": "Import not found"}
 
         menu_import.status = ImportStatus.processing
+        menu_import.processing_started_at = datetime.now(timezone.utc)
+        menu_import.ingested_at = None
         await db.commit()
 
         try:
@@ -46,8 +48,8 @@ async def process_menu_import_task(ctx: dict, import_id: str) -> dict:
                     category_name=item.category_name,
                     item_name=item.item_name,
                     description=item.description,
-                    price=item.price,
-                    modifiers=item.modifiers,
+                    unit_amount=item.unit_amount,
+                    option_lists=item.option_lists,
                     dietary_tags=item.dietary_tags,
                     allergens=item.allergens,
                     confidence=item.confidence,
@@ -56,6 +58,7 @@ async def process_menu_import_task(ctx: dict, import_id: str) -> dict:
                 db.add(import_item)
 
             menu_import.status = ImportStatus.review
+            menu_import.ingested_at = datetime.now(timezone.utc)
             await db.commit()
 
             return {"status": "success", "items_count": len(extraction_result.items)}

@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 async function getStoreBySlug(slug: string) {
-    const res = await fetch(`${API_URL}/stores/${slug}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${API_URL}/stores/slug/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) return null;
     return res.json();
 }
@@ -43,65 +43,83 @@ export default async function OrderPage({
     const statusInfo = STATUS_LABELS[order.status] || STATUS_LABELS.pending;
 
     return (
-        <div className="container mx-auto max-w-2xl px-4 py-6">
-            <div className="mb-6 text-center">
-                <h1 className="text-2xl font-bold">Order Confirmed!</h1>
-                <p className="mt-1 text-muted-foreground">
+        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="mb-6 rounded-[2rem] border border-border/70 bg-card p-6 text-center shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Order placed</p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight">Order confirmed</h1>
+                <p className="mt-2 text-muted-foreground">
                     Order #{order.order_number}
                 </p>
-                <Badge variant={statusInfo.variant} className="mt-2">
+                <Badge variant={statusInfo.variant} className="mt-3 rounded-full px-3 py-1">
                     {statusInfo.label}
                 </Badge>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Order Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    {order.items?.map((item: { id: string; quantity: number; product_name: string; total_price: number; modifiers?: { id: string; modifier_name: string }[] }) => (
-                        <div key={item.id} className="flex justify-between text-sm">
-                            <div>
-                                <span>
-                                    {item.quantity}x {item.product_name}
-                                </span>
-                                {item.modifiers && item.modifiers.length > 0 && (
-                                    <p className="text-muted-foreground text-xs">
-                                        {item.modifiers.map((m: { modifier_name: string }) => m.modifier_name).join(", ")}
-                                    </p>
-                                )}
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+                <Card className="rounded-[1.75rem] border-border/70">
+                    <CardHeader>
+                        <CardTitle>Order Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {order.items?.map((item: { id: string; quantity: number; product_name: string; total_amount: number; options?: { id: string; option_name: string }[] }) => (
+                            <div key={item.id} className="flex justify-between text-sm">
+                                <div>
+                                    <span>
+                                        {item.quantity}x {item.product_name}
+                                    </span>
+                                    {item.options && item.options.length > 0 && (
+                                        <p className="text-muted-foreground text-xs">
+                                            {item.options.map((option: { option_name: string }) => option.option_name).join(", ")}
+                                        </p>
+                                    )}
+                                </div>
+                                <span>${(Number(item.total_amount) / 100).toFixed(2)}</span>
                             </div>
-                            <span>${Number(item.total_price).toFixed(2)}</span>
+                        ))}
+
+                        <Separator />
+
+                        <div className="flex justify-between text-sm">
+                            <span>Subtotal</span>
+                            <span>${(Number(order.subtotal_amount) / 100).toFixed(2)}</span>
                         </div>
-                    ))}
-
-                    <Separator />
-
-                    <div className="flex justify-between text-sm">
-                        <span>Subtotal</span>
-                        <span>${Number(order.subtotal).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Tax</span>
-                        <span>${Number(order.tax).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between font-bold">
-                        <span>Total</span>
-                        <span>${Number(order.total).toFixed(2)}</span>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {(order.customer_name || order.customer_email) && (
-                <Card className="mt-4">
-                    <CardContent className="pt-6 text-sm space-y-1">
-                        {order.customer_name && <p><span className="font-medium">Name:</span> {order.customer_name}</p>}
-                        {order.customer_email && <p><span className="font-medium">Email:</span> {order.customer_email}</p>}
-                        {order.customer_phone && <p><span className="font-medium">Phone:</span> {order.customer_phone}</p>}
-                        {order.notes && <p><span className="font-medium">Notes:</span> {order.notes}</p>}
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>Tax</span>
+                            <span>${(Number(order.tax_amount) / 100).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold">
+                            <span>Total</span>
+                            <span>${(Number(order.total_amount) / 100).toFixed(2)}</span>
+                        </div>
                     </CardContent>
                 </Card>
-            )}
+
+                <div className="space-y-4 lg:sticky lg:top-28">
+                    {(order.customer_name || order.customer_email) && (
+                        <Card className="rounded-[1.75rem] border-border/70">
+                            <CardHeader>
+                                <CardTitle>Customer</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2 text-sm">
+                                {order.customer_name && <p><span className="font-medium">Name:</span> {order.customer_name}</p>}
+                                {order.customer_email && <p><span className="font-medium">Email:</span> {order.customer_email}</p>}
+                                {order.customer_phone && <p><span className="font-medium">Phone:</span> {order.customer_phone}</p>}
+                                {order.notes && <p><span className="font-medium">Notes:</span> {order.notes}</p>}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    <Card className="rounded-[1.75rem] border-border/70">
+                        <CardHeader>
+                            <CardTitle>What happens next</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            <p>The store will update your order status as it moves from confirmation to pickup readiness.</p>
+                            <p>Keep this page handy if you need to reference your order number when collecting it.</p>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
         </div>
     );
 }

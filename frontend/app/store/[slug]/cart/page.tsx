@@ -5,23 +5,47 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
-import { useCartStore, type CartItem as CartItemType, type CartModifier } from "@/lib/cart-store";
+import { useCartStore, type CartItem as CartItemType, type CartOption } from "@/lib/cart-store";
 import { Edit3, Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
-function product_modifier_groups_from_item(item: CartItemType) {
-    type SimpleMod = { id: string; name: string; price_adjustment: number };
-    const map: Record<string, { id: string; name: string; modifiers: SimpleMod[] }> = {};
-    for (const m of item.modifiers as CartModifier[]) {
-        const gid = m.group_id ?? "default";
-        map[gid] = map[gid] ?? { id: gid, name: gid === "default" ? "Options" : gid, modifiers: [] };
-        if (!map[gid].modifiers.find((mm) => mm.id === m.modifier_id)) {
-            map[gid].modifiers.push({ id: m.modifier_id, name: m.modifier_name, price_adjustment: m.price_adjustment });
+function product_option_lists_from_item(item: CartItemType) {
+    type SimpleOption = {
+        id: string;
+        name: string;
+        unit_amount: number;
+        min_option_choice_quantity: number;
+        max_option_choice_quantity: number;
+        default_quantity: number;
+    };
+    const map: Record<string, { id: string; name: string; options: SimpleOption[] }> = {};
+    for (const option of item.options as CartOption[]) {
+        const listId = option.option_list_id ?? "default";
+        map[listId] = map[listId] ?? { id: listId, name: listId === "default" ? "Options" : listId, options: [] };
+        if (!map[listId].options.find((entry) => entry.id === option.option_id)) {
+            map[listId].options.push({
+                id: option.option_id,
+                name: option.option_name,
+                unit_amount: option.unit_amount,
+                min_option_choice_quantity: 0,
+                max_option_choice_quantity: 1,
+                default_quantity: 0,
+            });
         }
     }
-    return Object.values(map).map((g) => ({ id: g.id, name: g.name, min_selections: 0, max_selections: undefined, modifiers: g.modifiers }));
+    return Object.values(map).map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        selection_node: "multi_select" as const,
+        min_num_options: 0,
+        max_num_options: entry.options.length,
+        min_aggregate_options_quantity: 0,
+        max_aggregate_options_quantity: 0,
+        is_optional: true,
+        options: entry.options,
+    }));
 }
 
 export default function CartPage() {
@@ -34,7 +58,7 @@ export default function CartPage() {
     const getSubtotal = useCartStore((s) => s.getSubtotal);
 
     const subtotal = getSubtotal();
-    const tax = subtotal * 0.08;
+    const tax = Math.round(subtotal * 0.08);
     const total = subtotal + tax;
     const [editItem, setEditItem] = useState<CartItemType | null>(null);
     const [editProduct, setEditProduct] = useState<ProductDialogProduct | null>(null);
@@ -43,7 +67,7 @@ export default function CartPage() {
         setEditItem(item);
         setEditProduct(null);
         try {
-            const store = await api.stores.getBySlug(slug);
+            const store = (await api.stores.getBySlug(slug)) as { id?: string };
             if (!store?.id) {
                 console.warn("store not found for slug", slug);
                 return;
@@ -62,20 +86,24 @@ export default function CartPage() {
 
     if (items.length === 0) {
         return (
-            <div className="container mx-auto px-4 py-16 text-center">
-                <h2 className="text-2xl font-bold">Your cart is empty</h2>
-                <p className="mt-2 text-muted-foreground">
-                    Add some items from the menu to get started
-                </p>
-                <Link href={`/store/${slug}/menu`}>
-                    <Button className="mt-4">Browse Menu</Button>
-                </Link>
+            <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-center rounded-4xl min-h-[75dvh] border border-border/70 bg-card px-6 py-12 text-center shadow-sm">
+                    <div>
+                        <h2 className="text-3xl font-semibold tracking-tight">Your cart is empty</h2>
+                        <p className="mt-3 text-base text-muted-foreground">
+                            Add some items from the menu to get started.
+                        </p>
+                        <Link href={`/store/${slug}`}>
+                            <Button className="mt-6 rounded-full px-6">Browse menu</Button>
+                        </Link>
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto max-w-2xl px-4 py-6">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
             {/* Edit dialog (supports fallback when product_modifier_groups are missing) */}
             {editItem && (
                 <ProductDialog
@@ -84,31 +112,35 @@ export default function CartPage() {
                             id: editItem.product_id,
                             name: editItem.product_name,
                             description: null,
-                            base_price: editItem.unit_price,
+                            unit_amount: editItem.unit_amount,
                             image_url: editItem.image_url ?? null,
-                            modifier_groups: editItem.product_modifier_groups ?? [],
+                            option_lists: editItem.product_option_lists ?? [],
                         }
                     }
                     cartItem={editItem}
                     onSaveEdit={(id, selections, qty) => {
-                        // convert selections back to modifiers array
-                        type Group = { id: string; name?: string; min_selections?: number; max_selections?: number; modifiers: { id: string; name: string; price_adjustment: number }[] };
-                        const groups: Group[] = (editProduct?.modifier_groups ?? editItem.product_modifier_groups ?? product_modifier_groups_from_item(editItem)) as Group[];
-                        const modifiers = groups.flatMap((group) =>
-                            group.modifiers.flatMap((mod) => {
-                                const selectedCount = selections[group.id]?.[mod.id] ?? 0;
+                        // convert selections back to options array
+                        type List = {
+                            id: string;
+                            options: { id: string; name: string; unit_amount: number }[];
+                        };
+                        const optionLists: List[] = (editProduct?.option_lists ?? editItem.product_option_lists ?? product_option_lists_from_item(editItem)) as List[];
+                        const options = optionLists.flatMap((list) =>
+                            list.options.flatMap((option) => {
+                                const selectedCount = selections[list.id]?.[option.id] ?? 0;
                                 if (selectedCount <= 0) return [];
 
                                 return Array.from({ length: selectedCount }, () => ({
-                                    modifier_id: mod.id,
-                                    modifier_name: mod.name,
-                                    price_adjustment: Number(mod.price_adjustment),
-                                    group_id: group.id,
+                                    option_id: option.id,
+                                    option_name: option.name,
+                                    unit_amount: Number(option.unit_amount),
+                                    quantity: 1,
+                                    option_list_id: list.id,
                                 }));
                             })
                         );
 
-                        updateItem(id, { quantity: qty, modifiers });
+                        updateItem(id, { quantity: qty, options });
                         setEditItem(null);
                         setEditProduct(null);
                     }}
@@ -118,58 +150,62 @@ export default function CartPage() {
                     }}
                 />
             )}
-            <div className="mb-4 rounded-2xl border bg-card p-4">
-                <h2 className="text-2xl font-bold tracking-tight">Your Cart</h2>
-                <p className="text-sm text-muted-foreground">
-                    Pickup order • Review items before secure checkout
-                </p>
+            <div className="mb-6 rounded-[2rem] border border-border/70 bg-card p-6 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Cart review</p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight">Your cart</h2>
+                <p className="mt-2 text-sm text-muted-foreground">Review items, make edits, and move directly to secure checkout.</p>
             </div>
 
-            <div className="mt-4 space-y-3">
-                {items.map((item) => (
-                    <CartItemRow
-                        key={item.id}
-                        item={item}
-                        onRemove={() => removeItem(item.id)}
-                        onUpdateQuantity={(qty) => updateQuantity(item.id, qty)}
-                        onEdit={() => handleEdit(item)}
-                    />
-                ))}
-            </div>
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+                <div className="space-y-3">
+                    {items.map((item) => (
+                        <CartItemRow
+                            key={item.id}
+                            item={item}
+                            onRemove={() => removeItem(item.id)}
+                            onUpdateQuantity={(qty) => updateQuantity(item.id, qty)}
+                            onEdit={() => handleEdit(item)}
+                        />
+                    ))}
+                </div>
 
-            <Separator className="my-6" />
+                <div className="rounded-[2rem] border border-border/70 bg-card p-5 shadow-sm lg:sticky lg:top-28">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Summary</p>
+                    <div className="mt-4 space-y-3 text-sm">
+                        <div className="flex justify-between">
+                            <span>Subtotal</span>
+                            <span>${(subtotal / 100).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-muted-foreground">
+                            <span>Tax (8%)</span>
+                            <span>${(tax / 100).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-muted-foreground">
+                            <span>Pickup fee</span>
+                            <span>$0.00</span>
+                        </div>
+                        <Separator />
+                        <div className="flex justify-between text-lg font-semibold">
+                            <span>Total</span>
+                            <span>${(total / 100).toFixed(2)}</span>
+                        </div>
+                    </div>
 
-            <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                    <span>Subtotal</span>
-                    <span>${subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                    <span>Tax (8%)</span>
-                    <span>${tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                    <span>Pickup fee</span>
-                    <span>$0.00</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span>${total.toFixed(2)}</span>
+                    <div className="mt-5 space-y-2">
+                        <Button className="w-full rounded-full">
+                            <Link href={`/store/${slug}/checkout`}>
+                                Checkout
+                            </Link>
+                        </Button>
+                        <Button variant="outline" className="w-full rounded-full">
+                            <Link href={`/store/${slug}`}>
+                                Continue shopping
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
             </div>
-
-            <div className="mt-6 flex gap-3">
-                <Link href={`/store/${slug}/menu`} className="flex-1">
-                    <Button variant="outline" className="w-full">
-                        Continue Shopping
-                    </Button>
-                </Link>
-                <Link href={`/store/${slug}/checkout`} className="flex-1">
-                    <Button className="w-full">Checkout</Button>
-                </Link>
-            </div>
-        </div>
+        </div >
     );
 }
 
@@ -184,29 +220,29 @@ function CartItemRow({
     onUpdateQuantity: (qty: number) => void;
     onEdit: () => void;
 }) {
-    const modTotal = item.modifiers.reduce(
-        (sum, m) => sum + m.price_adjustment,
+    const optionsTotal = item.options.reduce(
+        (sum, option) => sum + option.unit_amount * option.quantity,
         0
     );
-    const lineTotal = (item.unit_price + modTotal) * item.quantity;
+    const lineTotal = (item.unit_amount + optionsTotal) * item.quantity;
 
     return (
-        <Card>
-            <CardContent className="flex items-center gap-4 p-4">
+        <Card className="rounded-[1.75rem] border-border/70">
+            <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
                 <div className="flex-1">
-                    <h3 className="font-semibold">{item.product_name}</h3>
-                    {item.modifiers.length > 0 && (
+                    <h3 className="font-semibold tracking-tight">{item.product_name}</h3>
+                    {item.options.length > 0 && (
                         <p className="text-sm text-muted-foreground">
-                            {item.modifiers.map((m) => m.modifier_name).join(", ")}
+                            {item.options.map((option) => option.option_name).join(", ")}
                         </p>
                     )}
-                    <p className="mt-1 text-sm font-medium">${lineTotal.toFixed(2)}</p>
+                    <p className="mt-2 text-sm font-semibold">${(lineTotal / 100).toFixed(2)}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-end sm:self-auto">
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-9 w-9 rounded-full"
                         onClick={() => onUpdateQuantity(item.quantity - 1)}
                     >
                         <Minus className="h-3 w-3" />
@@ -215,7 +251,7 @@ function CartItemRow({
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-9 w-9 rounded-full"
                         onClick={() => onUpdateQuantity(item.quantity + 1)}
                     >
                         <Plus className="h-3 w-3" />
@@ -223,7 +259,7 @@ function CartItemRow({
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive"
+                        className="h-9 w-9 rounded-full text-destructive"
                         onClick={onRemove}
                     >
                         <Trash2 className="h-3 w-3" />
@@ -231,7 +267,7 @@ function CartItemRow({
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-9 w-9 rounded-full"
                         onClick={onEdit}
                     >
                         <Edit3 className="h-3 w-3" />

@@ -1,10 +1,7 @@
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from pydantic import BaseModel, Field
 
-
-# --- Category ---
 
 class CategoryCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -33,76 +30,92 @@ class CategoryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# --- Modifier ---
-
-class ModifierCreate(BaseModel):
+class OptionCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    price_adjustment: Decimal = Decimal("0.00")
+    unit_amount: int = Field(default=0, ge=0)
+    currency: str = Field(default="USD", min_length=3, max_length=3)
+    decimal_places: int = Field(default=2, ge=0, le=4)
+    min_option_choice_quantity: int = Field(default=0, ge=0)
+    max_option_choice_quantity: int = Field(default=1, ge=0)
+    default_quantity: int = Field(default=0, ge=0)
     is_default: bool = False
     sort_order: int = 0
 
 
-class ModifierResponse(BaseModel):
+class OptionResponse(BaseModel):
     id: uuid.UUID
-    modifier_group_id: uuid.UUID
+    option_list_id: uuid.UUID
     name: str
-    price_adjustment: Decimal
+    unit_amount: int
+    currency: str
+    decimal_places: int
+    min_option_choice_quantity: int
+    max_option_choice_quantity: int
+    default_quantity: int
     is_default: bool
     sort_order: int
 
     model_config = {"from_attributes": True}
 
 
-# --- ModifierGroup ---
-
-class ModifierGroupCreate(BaseModel):
+class OptionListCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    min_selections: int = 0
-    max_selections: int = 1
-    is_required: bool = False
-    modifiers: list[ModifierCreate] = []
+    selection_node: str = Field(default="multi_select")
+    min_num_options: int = Field(default=0, ge=0)
+    max_num_options: int = Field(default=1, ge=0)
+    min_aggregate_options_quantity: int = Field(default=0, ge=0)
+    max_aggregate_options_quantity: int = Field(default=0, ge=0)
+    is_optional: bool = True
+    sort_order: int = 0
+    options: list[OptionCreate] = []
 
 
-class ModifierGroupResponse(BaseModel):
+class OptionListResponse(BaseModel):
     id: uuid.UUID
     product_id: uuid.UUID
     name: str
-    min_selections: int
-    max_selections: int
-    is_required: bool
-    modifiers: list[ModifierResponse] = []
+    selection_node: str
+    min_num_options: int
+    max_num_options: int
+    min_aggregate_options_quantity: int
+    max_aggregate_options_quantity: int
+    is_optional: bool
+    sort_order: int
+    options: list[OptionResponse] = []
 
     model_config = {"from_attributes": True}
 
-
-# --- Product ---
 
 class ProductCreate(BaseModel):
     category_id: uuid.UUID | None = None
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
-    base_price: Decimal = Field(..., ge=0)
+    unit_amount: int = Field(..., ge=0)
+    currency: str = Field(default="USD", min_length=3, max_length=3)
+    decimal_places: int = Field(default=2, ge=0, le=4)
     image_url: str | None = None
     is_active: bool = True
     sort_order: int = 0
     dietary_tags: list[str] = []
     allergens: list[str] = []
     ingredients: str | None = None
-    modifier_groups: list[ModifierGroupCreate] = []
+    option_lists: list[OptionListCreate] = []
 
 
 class ProductUpdate(BaseModel):
     category_id: uuid.UUID | None = None
     name: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
-    base_price: Decimal | None = Field(None, ge=0)
+    unit_amount: int | None = Field(None, ge=0)
+    currency: str | None = Field(None, min_length=3, max_length=3)
+    decimal_places: int | None = Field(None, ge=0, le=4)
     image_url: str | None = None
     is_active: bool | None = None
     sort_order: int | None = None
     dietary_tags: list[str] | None = None
     allergens: list[str] | None = None
     ingredients: str | None = None
-    modifier_groups: list[ModifierGroupCreate] | None = None
+    option_lists: list[OptionListCreate] | None = None
 
 
 class ProductResponse(BaseModel):
@@ -111,14 +124,16 @@ class ProductResponse(BaseModel):
     category_id: uuid.UUID | None
     name: str
     description: str | None
-    base_price: Decimal
+    unit_amount: int
+    currency: str
+    decimal_places: int
     image_url: str | None
     is_active: bool
     sort_order: int
     dietary_tags: list[str] | None
     allergens: list[str] | None
     ingredients: str | None
-    modifier_groups: list[ModifierGroupResponse] = []
+    option_lists: list[OptionListResponse] = []
     created_at: datetime
     updated_at: datetime
 

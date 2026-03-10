@@ -90,7 +90,7 @@ export function DataTable<TData, TValue>({
     emptyAction,
     searchColumnId,
     searchPlaceholder = "Search...",
-    defaultPageSize = 10,
+    defaultPageSize = 20,
     enableRowSelection = false,
     getRowId,
     enableDefaultActionBar = true,
@@ -183,8 +183,8 @@ export function DataTable<TData, TValue>({
     }, [onSelectionChange, rowSelection, selectedCount, selectedRows, table]);
 
     return (
-        <div className="space-y-3 py-3 h-full min-w-0 w-full flex flex-col">
-            {enableDefaultActionBar && <div className="sticky top-0 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="pt-3 h-full min-w-0 w-full flex flex-col">
+            {enableDefaultActionBar && <div className="sticky mb-3 top-0 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 {searchableColumn ? (
                     <Input
                         placeholder={searchPlaceholder}
@@ -224,11 +224,11 @@ export function DataTable<TData, TValue>({
                     </DropdownMenu>
                 </div>
             </div>}
-            {actionBar && <div className="sticky top-0 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">{actionBar}</div>}
+            {actionBar && <div className="sticky mb-3 top-0 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">{actionBar}</div>}
             {/* Table */}
             <div className={`${table.getState().pagination.pageSize > 10 ? "overflow-y-auto" : "overflow-y-hidden"} overscroll-none overflow-x-auto rounded-md border bg-background-elevated flex-1 min-w-0 w-full`}>
                 <Table>
-                    <TableHeader className="sticky top-0 bg-background-elevated-2 z-10 shadow-lg">
+                    <TableHeader className="sticky top-0 bg-background-elevated-2 z-10 shadow dark:shadow-lg">
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => (

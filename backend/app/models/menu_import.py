@@ -1,8 +1,7 @@
 import uuid
 import enum
-from decimal import Decimal
-from datetime import datetime
-from sqlalchemy import String, Text, Float, DateTime, ForeignKey, Enum
+from datetime import datetime, timezone
+from sqlalchemy import String, Text, Float, Integer, DateTime, ForeignKey, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy import inspect
@@ -39,6 +38,7 @@ class MenuImport(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     uploaded_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     file_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     file_type: Mapped[FileType] = mapped_column(Enum(FileType), nullable=False)
     status: Mapped[ImportStatus] = mapped_column(
         Enum(ImportStatus), nullable=False, default=ImportStatus.uploading
@@ -47,6 +47,8 @@ class MenuImport(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     parsed_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     confidence_scores: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     error_log: Mapped[str | None] = mapped_column(Text, nullable=True)
+    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
@@ -63,6 +65,57 @@ class MenuImport(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             return f"<MenuImport {identity} status={status}>"
         return f"<MenuImport id={identity}>"
 
+    @property
+    def ingest_duration_seconds(self) -> int | None:
+        if self.ingested_at:
+            return max(0, int((self.ingested_at - self.created_at).total_seconds()))
+        if self.status in (ImportStatus.review, ImportStatus.published, ImportStatus.failed):
+            return max(0, int((self.updated_at - self.created_at).total_seconds()))
+        return None
+
+    @property
+    def processing_elapsed_seconds(self) -> int | None:
+        if self.ingested_at or self.status not in (ImportStatus.uploading, ImportStatus.processing):
+            return None
+        now = datetime.now(timezone.utc)
+        return max(0, int((now - self.created_at).total_seconds()))
+
+    @property
+    def ai_processing_seconds(self) -> int | None:
+        start_at = self.processing_started_at or self.created_at
+        if self.ingested_at:
+            return max(0, int((self.ingested_at - start_at).total_seconds()))
+        if self.status in (ImportStatus.uploading, ImportStatus.processing):
+            now = datetime.now(timezone.utc)
+            return max(0, int((now - start_at).total_seconds()))
+        if self.status in (ImportStatus.review, ImportStatus.published, ImportStatus.failed):
+            return max(0, int((self.updated_at - start_at).total_seconds()))
+        return None
+
+    @property
+    def file_size_mb(self) -> float | None:
+        if self.file_size_bytes is None:
+            return None
+        if self.file_size_bytes < 0:
+            return None
+        return round(self.file_size_bytes / (1024 * 1024), 4)
+
+    @property
+    def ai_seconds_per_mb(self) -> float | None:
+        ai_seconds = self.ai_processing_seconds
+        file_mb = self.file_size_mb
+        if ai_seconds is None or file_mb is None or file_mb <= 0:
+            return None
+        return round(ai_seconds / file_mb, 4)
+
+    @property
+    def ai_mb_per_second(self) -> float | None:
+        ai_seconds = self.ai_processing_seconds
+        file_mb = self.file_size_mb
+        if ai_seconds is None or file_mb is None or ai_seconds <= 0:
+            return None
+        return round(file_mb / ai_seconds, 4)
+
 
 class MenuImportItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "menu_import_items"
@@ -73,8 +126,8 @@ class MenuImportItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     category_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     item_name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    price: Mapped[Decimal | None] = mapped_column(Float, nullable=True)
-    modifiers: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    unit_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    option_lists: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     dietary_tags: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     allergens: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     confidence: Mapped[float] = mapped_column(Float, default=0.0)

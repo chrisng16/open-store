@@ -31,15 +31,15 @@ def validate_extraction(result: MenuExtractionResult) -> MenuExtractionResult:
     for item in result.items:
         confidence = item.confidence
 
-        # Validate price
-        if item.price is not None:
-            if item.price < 0:
-                item.price = abs(item.price)
+        # Validate price in cents
+        if item.unit_amount is not None:
+            if item.unit_amount < 0:
+                item.unit_amount = abs(item.unit_amount)
                 confidence *= 0.7
-            elif item.price == 0:
+            elif item.unit_amount == 0:
                 confidence *= 0.5  # Suspicious — might be a free item or extraction error
-            elif item.price > 500:
-                confidence *= 0.6  # Unusual price — might be in cents
+            elif item.unit_amount > 500000:
+                confidence *= 0.6  # Unusual price in cents
         else:
             confidence *= 0.4  # Missing price is a significant issue
 
@@ -62,16 +62,28 @@ def validate_extraction(result: MenuExtractionResult) -> MenuExtractionResult:
             if a.lower().strip() in VALID_ALLERGENS
         ]
 
-        # Validate modifier groups
-        for group_index, mg in enumerate(item.modifier_groups):
-            mg.group_name = mg.group_name.strip()
-            mg.min_selections = max(0, mg.min_selections)
-            mg.max_selections = max(mg.min_selections, mg.max_selections)
-            mg.sort_order = max(0, mg.sort_order if mg.sort_order is not None else group_index)
+        # Validate option lists
+        for group_index, option_list in enumerate(item.option_lists):
+            option_list.name = option_list.name.strip()
+            option_list.min_num_options = max(0, option_list.min_num_options)
+            option_list.max_num_options = max(option_list.min_num_options, option_list.max_num_options)
+            option_list.min_aggregate_options_quantity = max(0, option_list.min_aggregate_options_quantity)
+            option_list.max_aggregate_options_quantity = max(
+                option_list.min_aggregate_options_quantity,
+                option_list.max_aggregate_options_quantity,
+            )
+            option_list.sort_order = max(0, option_list.sort_order if option_list.sort_order is not None else group_index)
 
-            for option_index, mod in enumerate(mg.options):
-                mod.name = mod.name.strip()
-                mod.sort_order = max(0, mod.sort_order if mod.sort_order is not None else option_index)
+            for option_index, option in enumerate(option_list.options):
+                option.name = option.name.strip()
+                option.unit_amount = max(0, option.unit_amount)
+                option.min_option_choice_quantity = max(0, option.min_option_choice_quantity)
+                option.max_option_choice_quantity = max(
+                    option.min_option_choice_quantity,
+                    option.max_option_choice_quantity,
+                )
+                option.default_quantity = max(0, option.default_quantity)
+                option.sort_order = max(0, option.sort_order if option.sort_order is not None else option_index)
 
         # Validate category
         if not item.category_name or len(item.category_name.strip()) == 0:

@@ -36,7 +36,7 @@ export default function DashboardLayout({
                 <div className="flex min-w-0">
                     <AppSidebar collapsible="icon" />
                     <SidebarInset className="bg-background-elevated min-w-0">
-                        <div className="h-[calc(100dvh-var(--header-height))] overflow-y-auto overflow-x-hidden overscroll-none">
+                        <div className="h-[calc(100dvh-var(--header-height)-0.5rem)] overflow-y-auto overflow-x-hidden overscroll-none">
                             {children}
                         </div>
                     </SidebarInset>

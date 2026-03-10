@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 async function getStoreBySlug(slug: string) {
-    const res = await fetch(`${API_URL}/stores/${slug}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${API_URL}/stores/slug/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) return null;
     return res.json();
 }

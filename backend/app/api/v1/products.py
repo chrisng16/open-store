@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.api.deps import get_store_context, require_role, StoreContext
 from app.models.store import MemberRole
-from app.models.product import Category, Product, ModifierGroup, Modifier
+from app.models.product import Category, Product, OptionList, Option
 from app.schemas.product import (
     CategoryCreate,
     CategoryUpdate,
@@ -96,7 +96,7 @@ async def list_products(
     query = (
         select(Product)
         .where(Product.store_id == store_id, Product.is_active == True)
-        .options(selectinload(Product.modifier_groups).selectinload(ModifierGroup.modifiers))
+        .options(selectinload(Product.option_lists).selectinload(OptionList.options))
         .order_by(Product.sort_order)
     )
     if category_id:
@@ -114,7 +114,7 @@ async def get_product(
     result = await db.execute(
         select(Product)
         .where(Product.id == product_id, Product.store_id == store_id)
-        .options(selectinload(Product.modifier_groups).selectinload(ModifierGroup.modifiers))
+        .options(selectinload(Product.option_lists).selectinload(OptionList.options))
     )
     product = result.scalar_one_or_none()
     if not product:
@@ -128,32 +128,41 @@ async def create_product(
     ctx: StoreContext = Depends(require_role(MemberRole.staff)),
     db: AsyncSession = Depends(get_db),
 ):
-    product_data = data.model_dump(exclude={"modifier_groups"})
+    product_data = data.model_dump(exclude={"option_lists"})
     product = Product(store_id=ctx.store.id, **product_data)
     db.add(product)
     await db.flush()
 
-    # Create modifier groups + modifiers
-    for mg_data in data.modifier_groups:
-        mg = ModifierGroup(
+    # Create option lists + options
+    for ol_data in data.option_lists:
+        ol = OptionList(
             product_id=product.id,
-            name=mg_data.name,
-            min_selections=mg_data.min_selections,
-            max_selections=mg_data.max_selections,
-            is_required=mg_data.is_required,
+            name=ol_data.name,
+            selection_node=ol_data.selection_node,
+            min_num_options=ol_data.min_num_options,
+            max_num_options=ol_data.max_num_options,
+            min_aggregate_options_quantity=ol_data.min_aggregate_options_quantity,
+            max_aggregate_options_quantity=ol_data.max_aggregate_options_quantity,
+            is_optional=ol_data.is_optional,
+            sort_order=ol_data.sort_order,
         )
-        db.add(mg)
+        db.add(ol)
         await db.flush()
 
-        for mod_data in mg_data.modifiers:
-            mod = Modifier(
-                modifier_group_id=mg.id,
-                name=mod_data.name,
-                price_adjustment=mod_data.price_adjustment,
-                is_default=mod_data.is_default,
-                sort_order=mod_data.sort_order,
+        for option_data in ol_data.options:
+            option = Option(
+                option_list_id=ol.id,
+                name=option_data.name,
+                unit_amount=option_data.unit_amount,
+                currency=option_data.currency,
+                decimal_places=option_data.decimal_places,
+                min_option_choice_quantity=option_data.min_option_choice_quantity,
+                max_option_choice_quantity=option_data.max_option_choice_quantity,
+                default_quantity=option_data.default_quantity,
+                is_default=option_data.is_default,
+                sort_order=option_data.sort_order,
             )
-            db.add(mod)
+            db.add(option)
 
     await db.flush()
 
@@ -161,7 +170,7 @@ async def create_product(
     result = await db.execute(
         select(Product)
         .where(Product.id == product.id)
-        .options(selectinload(Product.modifier_groups).selectinload(ModifierGroup.modifiers))
+        .options(selectinload(Product.option_lists).selectinload(OptionList.options))
     )
     return result.scalar_one()
 
@@ -176,37 +185,46 @@ async def update_product(
     result = await db.execute(
         select(Product)
         .where(Product.id == product_id, Product.store_id == ctx.store.id)
-        .options(selectinload(Product.modifier_groups).selectinload(ModifierGroup.modifiers))
+        .options(selectinload(Product.option_lists).selectinload(OptionList.options))
     )
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    update_payload = data.model_dump(exclude_unset=True, exclude={"modifier_groups"})
+    update_payload = data.model_dump(exclude_unset=True, exclude={"option_lists"})
     for field, value in update_payload.items():
         setattr(product, field, value)
 
-    if data.modifier_groups is not None:
-        product.modifier_groups.clear()
+    if data.option_lists is not None:
+        product.option_lists.clear()
         await db.flush()
 
-        for mg_data in data.modifier_groups:
-            mg = ModifierGroup(
+        for ol_data in data.option_lists:
+            ol = OptionList(
                 product_id=product.id,
-                name=mg_data.name,
-                min_selections=mg_data.min_selections,
-                max_selections=mg_data.max_selections,
-                is_required=mg_data.is_required,
+                name=ol_data.name,
+                selection_node=ol_data.selection_node,
+                min_num_options=ol_data.min_num_options,
+                max_num_options=ol_data.max_num_options,
+                min_aggregate_options_quantity=ol_data.min_aggregate_options_quantity,
+                max_aggregate_options_quantity=ol_data.max_aggregate_options_quantity,
+                is_optional=ol_data.is_optional,
+                sort_order=ol_data.sort_order,
             )
-            product.modifier_groups.append(mg)
+            product.option_lists.append(ol)
 
-            for mod_data in mg_data.modifiers:
-                mg.modifiers.append(
-                    Modifier(
-                        name=mod_data.name,
-                        price_adjustment=mod_data.price_adjustment,
-                        is_default=mod_data.is_default,
-                        sort_order=mod_data.sort_order,
+            for option_data in ol_data.options:
+                ol.options.append(
+                    Option(
+                        name=option_data.name,
+                        unit_amount=option_data.unit_amount,
+                        currency=option_data.currency,
+                        decimal_places=option_data.decimal_places,
+                        min_option_choice_quantity=option_data.min_option_choice_quantity,
+                        max_option_choice_quantity=option_data.max_option_choice_quantity,
+                        default_quantity=option_data.default_quantity,
+                        is_default=option_data.is_default,
+                        sort_order=option_data.sort_order,
                     )
                 )
 

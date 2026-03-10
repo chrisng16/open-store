@@ -16,19 +16,20 @@ export type ProductRow = {
     id: string;
     name: string;
     description: string | null;
-    basePrice: number;
+    unitAmount: number;
     imageUrl?: string | null;
     categoryId: string | null;
     isActive: boolean;
     dietaryTags: string[] | null;
-    modifierGroups?: {
+    optionLists?: {
         name: string;
-        minSelections: number;
-        maxSelections: number;
-        isRequired: boolean;
-        modifiers: {
+        selectionNode: string;
+        minNumOptions: number;
+        maxNumOptions: number;
+        isOptional: boolean;
+        options: {
             name: string;
-            priceAdjustment: number;
+            unitAmount: number;
             isDefault: boolean;
             sortOrder: number;
         }[];
@@ -75,7 +76,7 @@ export function getProductsTableColumns({
             },
         },
         {
-            accessorKey: "basePrice",
+            accessorKey: "unitAmount",
             size: 90,
             minSize: 80,
             maxSize: 90,
@@ -85,7 +86,7 @@ export function getProductsTableColumns({
                 </div>
             ),
             cell: ({ row }) => (
-                <div className="text-left">${Number(row.original.basePrice).toFixed(2)}</div>
+                <div className="text-left">${(Number(row.original.unitAmount) / 100).toFixed(2)}</div>
             ),
         },
         {

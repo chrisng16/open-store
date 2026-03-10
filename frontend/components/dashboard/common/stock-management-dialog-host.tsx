@@ -144,19 +144,30 @@ export function StockManagementDialogHost() {
                     denormalizeRequest({
                         name: productFormData.name,
                         description: productFormData.description || null,
-                        basePrice: parsedPrice,
+                        unitAmount: Math.round(parsedPrice * 100),
+                        currency: "USD",
+                        decimalPlaces: 2,
                         imageUrl: productFormData.imageUrl || null,
                         categoryId: resolvedCategoryId,
-                        modifierGroups: productFormData.modifierGroups.map((group) => ({
-                            name: group.name.trim(),
-                            minSelections: group.minSelections,
-                            maxSelections: group.maxSelections,
-                            isRequired: group.isRequired,
-                            modifiers: group.modifiers.map((modifier, index) => ({
-                                name: modifier.name.trim(),
-                                priceAdjustment: Number(modifier.priceAdjustment || 0),
-                                isDefault: modifier.isDefault,
-                                sortOrder: modifier.sortOrder ?? index,
+                        optionLists: productFormData.optionLists.map((optionList, optionListIndex) => ({
+                            name: optionList.name.trim(),
+                            selectionNode: optionList.maxNumOptions === 1 ? "single_select" : "multi_select",
+                            minNumOptions: optionList.minNumOptions,
+                            maxNumOptions: optionList.maxNumOptions,
+                            minAggregateOptionsQuantity: 0,
+                            maxAggregateOptionsQuantity: 0,
+                            isOptional: optionList.isOptional,
+                            sortOrder: optionListIndex,
+                            options: optionList.options.map((option, index) => ({
+                                name: option.name.trim(),
+                                unitAmount: Math.round(Number(option.unitAmount || 0) * 100),
+                                currency: "USD",
+                                decimalPlaces: 2,
+                                minOptionChoiceQuantity: 0,
+                                maxOptionChoiceQuantity: 1,
+                                defaultQuantity: option.isDefault ? 1 : 0,
+                                isDefault: option.isDefault,
+                                sortOrder: option.sortOrder ?? index,
                             })),
                         })),
                     })
@@ -209,23 +220,27 @@ export function StockManagementDialogHost() {
             return;
         }
 
-        for (const group of productFormData.modifierGroups) {
-            if (!group.name.trim()) {
-                toast.error("Each modifier group must have a name");
+        for (const optionList of productFormData.optionLists) {
+            if (!optionList.name.trim()) {
+                toast.error("Each option list must have a name");
                 return;
             }
-            if (group.minSelections < 0 || group.maxSelections < 0 || group.minSelections > group.maxSelections) {
-                toast.error(`Invalid min/max selections in group \"${group.name || "(unnamed)"}\"`);
+            if (
+                optionList.minNumOptions < 0 ||
+                optionList.maxNumOptions < 0 ||
+                optionList.minNumOptions > optionList.maxNumOptions
+            ) {
+                toast.error(`Invalid min/max options in list \"${optionList.name || "(unnamed)"}\"`);
                 return;
             }
-            for (const modifier of group.modifiers) {
-                if (!modifier.name.trim()) {
-                    toast.error(`Each option in group \"${group.name}\" must have a name`);
+            for (const option of optionList.options) {
+                if (!option.name.trim()) {
+                    toast.error(`Each option in list \"${optionList.name}\" must have a name`);
                     return;
                 }
-                const parsedAdjustment = Number(modifier.priceAdjustment || 0);
+                const parsedAdjustment = Number(option.unitAmount || 0);
                 if (!Number.isFinite(parsedAdjustment)) {
-                    toast.error(`Option \"${modifier.name}\" has invalid price adjustment`);
+                    toast.error(`Option \"${option.name}\" has invalid price adjustment`);
                     return;
                 }
             }

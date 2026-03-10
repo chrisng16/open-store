@@ -103,20 +103,20 @@ export default function MenuEditorPage({
                         id: product.id,
                         name: product.name,
                         description: product.description ?? "",
-                        basePrice: String(product.basePrice),
+                        basePrice: String((product.unitAmount ?? 0) / 100),
                         imageUrl: product.imageUrl ?? "",
                         categoryId: product.categoryId ?? "",
                         categoryName: selectedCategoryName,
-                        modifierGroups: (product.modifierGroups ?? []).map((group) => ({
+                        optionLists: (product.optionLists ?? []).map((group) => ({
                             name: group.name,
-                            minSelections: group.minSelections,
-                            maxSelections: group.maxSelections,
-                            isRequired: group.isRequired,
-                            modifiers: group.modifiers.map((modifier) => ({
-                                name: modifier.name,
-                                priceAdjustment: String(modifier.priceAdjustment ?? 0),
-                                isDefault: modifier.isDefault,
-                                sortOrder: modifier.sortOrder,
+                            minNumOptions: group.minNumOptions,
+                            maxNumOptions: group.maxNumOptions,
+                            isOptional: group.isOptional,
+                            options: group.options.map((option) => ({
+                                name: option.name,
+                                unitAmount: String((option.unitAmount ?? 0) / 100),
+                                isDefault: option.isDefault,
+                                sortOrder: option.sortOrder,
                             })),
                         })),
                     });

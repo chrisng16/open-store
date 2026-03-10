@@ -1,42 +1,46 @@
-import { CartButton } from "@/components/store/cart-button";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { MenuBrowser } from "@/components/store/menu-browser";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
-type Store = {
+type Option = {
     id: string;
     name: string;
-    description: string | null;
-    banner_url: string | null;
-    is_active: boolean;
+    unit_amount: number;
+    min_option_choice_quantity: number;
+    max_option_choice_quantity: number;
+    default_quantity: number;
+};
+
+type OptionList = {
+    id: string;
+    name: string;
+    selection_node: "single_select" | "multi_select" | "aggregate_quantity";
+    min_num_options: number;
+    max_num_options: number;
+    min_aggregate_options_quantity: number;
+    max_aggregate_options_quantity: number;
+    is_optional: boolean;
+    options: Option[];
 };
 
 type Product = {
     id: string;
+    store_id: string;
+    category_id: string | null;
     name: string;
     description: string | null;
-    base_price: number;
+    unit_amount: number;
     image_url: string | null;
+    dietary_tags: string[] | null;
+    allergens: string[] | null;
+    option_lists: OptionList[];
 };
 
 type Category = {
     id: string;
     name: string;
+    description: string | null;
 };
-
-async function getStoreBySlug(slug: string): Promise<Store | null> {
-    try {
-        const res = await fetch(`${API_URL}/stores/${slug}`, { next: { revalidate: 60 } });
-        if (!res.ok) return null;
-        return res.json();
-    } catch {
-        return null;
-    }
-}
 
 async function getCategories(storeId: string): Promise<Category[]> {
     try {
@@ -62,120 +66,76 @@ async function getProducts(storeId: string): Promise<Product[]> {
     }
 }
 
-export default async function StoreIndexPage({
+async function getStoreBySlug(slug: string) {
+    try {
+        const res = await fetch(`${API_URL}/stores/slug/${slug}`, {
+            next: { revalidate: 60 },
+        });
+        if (!res.ok) return null;
+        return res.json();
+    } catch {
+        return null;
+    }
+}
+
+export default async function MenuPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ slug: string }>;
+    searchParams: Promise<{ category?: string }>;
 }) {
     const { slug } = await params;
-    const store = await getStoreBySlug(slug);
+    const { category } = await searchParams;
 
-    if (!store) notFound();
+    const store = await getStoreBySlug(slug);
+    if (!store) return <div className="p-8 text-center">Store not found</div>;
 
     const [categories, products] = await Promise.all([
         getCategories(store.id),
         getProducts(store.id),
     ]);
 
-    const featuredProducts = products.slice(0, 4);
-    const bannerStyle = store.banner_url
-        ? {
-            backgroundImage: `linear-gradient(to right, color-mix(in srgb, var(--store-primary) 55%, transparent), color-mix(in srgb, var(--store-accent) 45%, transparent)), url(${store.banner_url})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-        }
-        : {
-            backgroundImage:
-                "linear-gradient(to right, color-mix(in srgb, var(--store-primary) 45%, transparent), color-mix(in srgb, var(--store-accent) 35%, transparent))",
-        };
+    const productsByCategory = categories.map((cat) => ({
+        ...cat,
+        products: products.filter((p) => p.category_id === cat.id),
+    }));
+
+    // Include uncategorized products
+    const uncategorized = products.filter(
+        (p) => !p.category_id || !categories.some((c) => c.id === p.category_id)
+    );
+
+    const hasRequestedCategory =
+        category && categories.some((cat) => cat.id === category);
+    const defaultTab = hasRequestedCategory
+        ? category
+        : categories[0]?.id || (uncategorized.length > 0 ? "other" : "all");
+
+    const sections = [
+        ...productsByCategory,
+        ...(uncategorized.length > 0
+            ? [{ id: "other", name: "Other", description: null, products: uncategorized }]
+            : []),
+    ];
 
     return (
-        <div className="container mx-auto space-y-8 px-4 py-6">
-            <section
-                style={bannerStyle}
-                className="overflow-hidden rounded-2xl border"
-            >
-                <div className="space-y-4 bg-background/70 px-6 py-10 backdrop-blur-sm md:max-w-xl md:py-14">
-                    <Badge variant={store.is_active ? "secondary" : "destructive"}>
-                        {store.is_active ? "Open for pickup" : "Temporarily unavailable"}
-                    </Badge>
-                    <h2 className="text-3xl font-bold tracking-tight md:text-4xl">{store.name}</h2>
-                    <p className="text-sm text-muted-foreground md:text-base">
-                        {store.description || "Freshly prepared food, ready for pickup."}
+        <>
+            {products.length === 0 ? (
+                <div className="py-16 text-center">
+                    <p className="text-lg text-muted-foreground">
+                        This store hasn&apos;t added any items yet
                     </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href={`/store/${slug}/menu`}>
-                            <Button size="lg">Start order</Button>
-                        </Link>
-                        <CartButton slug={slug} />
-                    </div>
                 </div>
-            </section>
-
-            <section className="space-y-3">
-                <h3 className="text-xl font-semibold tracking-tight">Browse by category</h3>
-                <div className="flex flex-wrap gap-2">
-                    {categories.slice(0, 8).map((category) => (
-                        <Link
-                            key={category.id}
-                            href={`/store/${slug}/menu?category=${category.id}`}
-                        >
-                            <Badge variant="outline" className="px-3 py-1 text-sm">
-                                {category.name}
-                            </Badge>
-                        </Link>
-                    ))}
-                    {categories.length === 0 && (
-                        <p className="text-sm text-muted-foreground">Menu categories will appear here soon.</p>
-                    )}
-                </div>
-            </section>
-
-            <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold tracking-tight">Featured picks</h3>
-                    <Link href={`/store/${slug}/menu`}>
-                        <Button variant="ghost" size="sm">
-                            View full menu
-                        </Button>
-                    </Link>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {featuredProducts.map((product) => (
-                        <Link key={product.id} href={`/store/${slug}/item/${product.id}`}>
-                            <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
-                                {product.image_url && (
-                                    <div className="aspect-4/3 overflow-hidden">
-                                        <img
-                                            src={product.image_url}
-                                            alt={product.name}
-                                            className="h-full w-full object-cover"
-                                        />
-                                    </div>
-                                )}
-                                <CardContent className="space-y-1 p-4">
-                                    <p className="font-semibold leading-tight">{product.name}</p>
-                                    {product.description && (
-                                        <p className="line-clamp-2 text-sm text-muted-foreground">
-                                            {product.description}
-                                        </p>
-                                    )}
-                                    <p className="pt-1 font-medium">${Number(product.base_price).toFixed(2)}</p>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    ))}
-                </div>
-
-                {featuredProducts.length === 0 && (
-                    <Card>
-                        <CardContent className="py-10 text-center text-muted-foreground">
-                            Featured items will appear once this store publishes products.
-                        </CardContent>
-                    </Card>
-                )}
-            </section>
-        </div>
+            ) : (
+                <MenuBrowser
+                    slug={slug}
+                    storeName={store.name}
+                    storeDescription={store.description}
+                    sections={sections.length > 0 ? sections : [{ id: "all", name: "Menu", description: null, products }]}
+                    defaultCategory={defaultTab}
+                />
+            )}
+        </>
     );
 }
