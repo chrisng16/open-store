@@ -5,11 +5,12 @@ import Link from "next/link";
 
 interface StoreSubNavProps {
     storeId: string;
-    storeName?: string;
+    storeName: string;
+    storeSlug: string;
     pending: boolean;
 }
 
-export default function StoreSubNav({ storeId, storeName, pending }: StoreSubNavProps) {
+export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: StoreSubNavProps) {
     const navItems = [
         { href: `/dashboard/${storeId}/orders`, label: "Orders", icon: ShoppingBag },
         { href: `/dashboard/${storeId}/products`, label: "Products", icon: Package },
@@ -18,19 +19,17 @@ export default function StoreSubNav({ storeId, storeName, pending }: StoreSubNav
     return (
         < div className="border-b rounded-t-md bg-background-elevated/70 backdrop-blur sticky top-0 z-10" >
             <div className="flex items-center justify-between px-6 py-3">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col">
                     {
                         pending ? <Skeleton className="h-6 w-32" /> : <h2 className="font-semibold text-xl">{storeName || "Store"}</h2>
                     }
-                    {storeName && (
-                        <Link
-                            href={`/store/${storeId}/products`}
-                            target="_blank"
-                            className="text-sm text-muted-foreground hover:text-foreground"
-                        >
-                            <ExternalLink className="inline h-3 w-3" />
-                        </Link>
-                    )}
+                    <Link
+                        href={`/store/${storeSlug}/`}
+                        target="_blank"
+                        className="text-sm text-muted-foreground hover:text-foreground flex items-center"
+                    >
+                        View Store <ExternalLink className="ml-1 h-3 w-3" />
+                    </Link>
                 </div>
                 <div className="flex gap-1">
                     {navItems.map((item) => {

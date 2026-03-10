@@ -2,13 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import type { CartItem, CartOption } from "@/lib/cart-store";
 import { cn } from "@/lib/utils";
 import { Minus, Plus } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
 import { Input } from "../ui/input";
 
@@ -318,31 +319,30 @@ export function ProductDialog({
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden rounded-[2rem] border border-border/70 p-0 sm:max-w-lg">
+            <DialogContent
+                closeButtonClassName="rounded-full p-1 bg-accent opacity-90"
+                className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden rounded-xl border border-border/70 p-0 sm:max-w-lg">
                 {/* Scrollable body */}
                 <div className="flex-1 overflow-y-auto">
-                    {product.image_url && (
-                        <div className="aspect-4/3 w-full overflow-hidden">
-                            <img
-                                src={product.image_url}
-                                alt={product.name}
-                                className="h-full w-full object-cover"
-                            />
-                        </div>
-                    )}
+                    <div className="aspect-video w-full overflow-hidden">
+                        <Image
+                            src={product.image_url || "https://static.photos/food/640x360/"}
+                            alt={product.name}
+                            width={640}
+                            height={360}
+                            className="h-full w-full object-cover"
+                        />
+                    </div>
 
                     <div className="px-5 pb-4 pt-5 sm:px-6">
                         <DialogHeader className="mb-1 text-left">
                             <DialogTitle className="text-2xl font-bold tracking-tight">
                                 {product.name}
                             </DialogTitle>
-                        </DialogHeader>
-
-                        {product.description && (
-                            <p className="text-sm leading-relaxed text-muted-foreground">
+                            <DialogDescription>
                                 {product.description}
-                            </p>
-                        )}
+                            </DialogDescription>
+                        </DialogHeader>
 
                         {product.option_lists.map((optionList) => (
                             <OptionListSection

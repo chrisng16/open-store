@@ -90,8 +90,8 @@ export default function StoreOverviewPage({ params }: StoreOverviewPageProps) {
 
     return (
         <>
-            <StoreSubNav pending={isPending} storeId={storeId} storeName={store?.name} />
-            <div className="p-4 md:p-6">
+            <StoreSubNav pending={isPending} storeId={storeId} storeName={store?.name} storeSlug={store?.slug} />
+            <div className="p-4 md:p-6 flex-1">
                 <StoreEditForm
                     ref={formRef}
                     store={store}

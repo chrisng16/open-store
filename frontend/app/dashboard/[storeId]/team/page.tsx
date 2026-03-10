@@ -272,7 +272,7 @@ export default function TeamPage({
             <TeamSubNav />
 
             <Tabs className="px-4 md:px-6" value={activeTab} onValueChange={handleTabChange}>
-                <div className="sticky top-19 z-20 flex items-center justify-between bg-background-elevated/80 py-2">
+                <div className="sticky top-19 z-20 flex items-center justify-between border-b bg-background-elevated/80 py-2">
                     <TabsList variant="line">
                         <TabsTrigger value="members">Team Members</TabsTrigger>
                         <TabsTrigger value="roles">Roles</TabsTrigger>
@@ -283,13 +283,13 @@ export default function TeamPage({
                         {activeTab === "roles" && canManageRoles ? (
                             <Button variant="outline" size="sm" onClick={() => setCreateRoleSheetOpen(true)}>
                                 <Plus className="h-4 w-4" />
-                                Add custom role
+                                Add role
                             </Button>
                         ) : null}
                         {canManageInvites ? (
                             <Button size="sm" onClick={() => setInviteDialogOpen(true)}>
                                 <UserPlus className="h-4 w-4" />
-                                Invite member
+                                Add member
                             </Button>
                         ) : null}
                     </div>
