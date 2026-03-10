@@ -8,6 +8,7 @@ from app.database import get_db
 from app.api.deps import get_current_user, get_store_context, require_role, CurrentUser, StoreContext
 from app.models.store import Store, StoreMember, MemberRole
 from app.schemas.store import StoreCreate, StoreUpdate, StoreResponse, StorePublicResponse
+from app.services.team import build_default_store_roles
 
 router = APIRouter(prefix="/stores", tags=["stores"])
 
@@ -49,8 +50,20 @@ async def create_store(
     db.add(store)
     await db.flush()
 
+    seeded_roles = build_default_store_roles(store.id)
+    for role in seeded_roles:
+        db.add(role)
+    await db.flush()
+
+    owner_role = next(role for role in seeded_roles if role.name == MemberRole.owner.value)
+
     # Make the creator the owner
-    member = StoreMember(store_id=store.id, user_id=user.id, role=MemberRole.owner)
+    member = StoreMember(
+        store_id=store.id,
+        user_id=user.id,
+        role=MemberRole.owner,
+        store_role_id=owner_role.id,
+    )
     db.add(member)
     await db.flush()
     await db.refresh(store)

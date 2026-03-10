@@ -10,6 +10,7 @@ from app.api.v1.orders import router as orders_router
 from app.api.v1.menu_imports import router as menu_imports_router
 from app.api.v1.uploads import router as uploads_router
 from app.api.v1.payments import router as payments_router
+from app.api.v1.team import store_router as team_store_router, accept_router as team_accept_router
 
 
 @asynccontextmanager
@@ -52,6 +53,8 @@ app.include_router(orders_router, prefix=api_prefix)
 app.include_router(menu_imports_router, prefix=api_prefix)
 app.include_router(uploads_router, prefix=api_prefix)
 app.include_router(payments_router, prefix=api_prefix)
+app.include_router(team_store_router, prefix=api_prefix)
+app.include_router(team_accept_router, prefix=api_prefix)
 
 
 @app.get("/")

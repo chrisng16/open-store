@@ -6,7 +6,7 @@ export default function Page() {
   return (
     <Dialog defaultOpen={true}>
       <DialogContent
-        className="w-[min(96vw,980px)] h-[min(86vh,720px)] p-0 overflow-hidden"
+        className="md:max-w-3xl max-w-xl h-4/5 w-full p-0 overflow-hidden"
         overlayClassName="bg-background/90"
         showCloseButton={false}
         onEscapeKeyDown={(e) => e.preventDefault()}
@@ -14,7 +14,7 @@ export default function Page() {
       >
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="border-b bg-background/80 backdrop-blur px-6 py-5">
+          <div className="border-b backdrop-blur px-6 py-5">
             <DialogHeader>
               <DialogTitle className="text-xl">Select a store</DialogTitle>
               <DialogDescription className="text-sm">

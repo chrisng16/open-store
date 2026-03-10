@@ -9,7 +9,7 @@ export default function ImportSubNav({ storeId, uploadMutation, handleUpload }: 
     return (
         <div className="sticky top-0 z-10 border-b rounded-t-md bg-background-elevated/70 backdrop-blur">
             <div className="flex items-center justify-between px-6 py-3">
-                <div className="">
+                <div>
                     <h1 className="font-semibold text-xl">AI Menu Import</h1>
                     <p className="text-sm text-muted-foreground">Upload a menu PDF, image, or spreadsheet — AI will extract items
                         automatically</p>

@@ -1,5 +1,6 @@
 import uuid
 import enum
+from datetime import datetime
 from sqlalchemy import String, Boolean, Text, ForeignKey, UniqueConstraint, Enum, Integer, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.base import NO_VALUE
@@ -12,6 +13,13 @@ class MemberRole(str, enum.Enum):
     owner = "owner"
     admin = "admin"
     staff = "staff"
+
+
+class InviteStatus(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    revoked = "revoked"
+    expired = "expired"
 
 
 DAY_OF_WEEK_ORDER = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")
@@ -43,6 +51,8 @@ class Store(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     products: Mapped[list["Product"]] = relationship(back_populates="store", cascade="all, delete-orphan")
     orders: Mapped[list["Order"]] = relationship(back_populates="store", cascade="all, delete-orphan")
     menu_imports: Mapped[list["MenuImport"]] = relationship(back_populates="store", cascade="all, delete-orphan")
+    invites: Mapped[list["StoreInvite"]] = relationship(back_populates="store", cascade="all, delete-orphan")
+    roles: Mapped[list["StoreRole"]] = relationship(back_populates="store", cascade="all, delete-orphan")
 
     @property
     def business_hours(self) -> dict | None:
@@ -144,9 +154,13 @@ class StoreMember(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     role: Mapped[MemberRole] = mapped_column(Enum(MemberRole), nullable=False, default=MemberRole.staff)
+    store_role_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("store_roles.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # Relationships
     store: Mapped["Store"] = relationship(back_populates="members")
+    store_role: Mapped["StoreRole | None"] = relationship(back_populates="members")
 
     def __repr__(self) -> str:
         return f"<StoreMember store={self.store_id} user={self.user_id} role={self.role}>"
@@ -181,6 +195,49 @@ class StoreBusinessHour(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             f"<StoreBusinessHour store={self.store_id} day={self.day_of_week} "
             f"status={self.status} order={self.sort_order}>"
         )
+
+
+class StoreInvite(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "store_invites"
+
+    store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stores.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    invited_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    invited_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[MemberRole] = mapped_column(Enum(MemberRole), nullable=False, default=MemberRole.staff)
+    token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    status: Mapped[InviteStatus] = mapped_column(
+        Enum(InviteStatus), nullable=False, default=InviteStatus.pending, index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    store: Mapped["Store"] = relationship(back_populates="invites")
+
+    def __repr__(self) -> str:
+        return f"<StoreInvite store={self.store_id} email={self.invited_email} status={self.status}>"
+
+
+class StoreRole(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "store_roles"
+    __table_args__ = (UniqueConstraint("store_id", "name", name="uq_store_roles_store_name"),)
+
+    store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stores.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    permissions: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_editable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    store: Mapped["Store"] = relationship(back_populates="roles")
+    members: Mapped[list["StoreMember"]] = relationship(back_populates="store_role")
+
+    def __repr__(self) -> str:
+        return f"<StoreRole store={self.store_id} name={self.name} priority={self.priority}>"
 
 
 # Avoid circular imports — these are referenced as strings in relationships

@@ -72,7 +72,7 @@ async def update_category(
 @router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_category(
     category_id: uuid.UUID,
-    ctx: StoreContext = Depends(require_role(MemberRole.admin)),
+    ctx: StoreContext = Depends(require_role(MemberRole.owner)),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -236,7 +236,7 @@ async def update_product(
 @router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(
     product_id: uuid.UUID,
-    ctx: StoreContext = Depends(require_role(MemberRole.admin)),
+    ctx: StoreContext = Depends(require_role(MemberRole.owner)),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
