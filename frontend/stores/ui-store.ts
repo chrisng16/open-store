@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 
 type CategoryDialogFormData = {
     id?: string;
@@ -35,6 +36,10 @@ type ProductDialogFormData = {
 type UIState = {
     isCategoryDialogOpen: boolean;
     isProductDialogOpen: boolean;
+    isStorefrontProductDialogOpen: boolean;
+    storefrontProductDialogItemId: string | null;
+    isCartProductDialogOpen: boolean;
+    cartProductDialogItemId: string | null;
     categoryFormData: CategoryDialogFormData;
     productFormData: ProductDialogFormData;
 
@@ -47,6 +52,12 @@ type UIState = {
     openProductEdit: (data: ProductDialogFormData) => void;
     closeProductDialog: () => void;
     setProductFormData: (data: ProductDialogFormData) => void;
+
+    openStorefrontProductDialog: (itemId: string) => void;
+    closeStorefrontProductDialog: () => void;
+
+    openCartProductDialog: (itemId: string) => void;
+    closeCartProductDialog: () => void;
 };
 
 export const emptyCategoryFormData: CategoryDialogFormData = {
@@ -69,6 +80,10 @@ export const emptyProductFormData: ProductDialogFormData = {
 export const useUIStore = create<UIState>((set) => ({
     isCategoryDialogOpen: false,
     isProductDialogOpen: false,
+    isStorefrontProductDialogOpen: false,
+    storefrontProductDialogItemId: null,
+    isCartProductDialogOpen: false,
+    cartProductDialogItemId: null,
     categoryFormData: emptyCategoryFormData,
     productFormData: emptyProductFormData,
 
@@ -97,6 +112,81 @@ export const useUIStore = create<UIState>((set) => ({
         }),
     closeProductDialog: () => set({ isProductDialogOpen: false }),
     setProductFormData: (data) => set({ productFormData: data }),
+
+    openStorefrontProductDialog: (itemId) =>
+        set({
+            isStorefrontProductDialogOpen: true,
+            storefrontProductDialogItemId: itemId,
+        }),
+    closeStorefrontProductDialog: () =>
+        set({
+            isStorefrontProductDialogOpen: false,
+        }),
+
+    openCartProductDialog: (itemId) =>
+        set({
+            isCartProductDialogOpen: true,
+            cartProductDialogItemId: itemId,
+        }),
+    closeCartProductDialog: () =>
+        set({
+            isCartProductDialogOpen: false,
+        }),
 }));
+
+export function useStockManagementDialogState() {
+    return useUIStore(
+        useShallow((state) => ({
+            isCategoryDialogOpen: state.isCategoryDialogOpen,
+            isProductDialogOpen: state.isProductDialogOpen,
+            categoryFormData: state.categoryFormData,
+            productFormData: state.productFormData,
+            closeCategoryDialog: state.closeCategoryDialog,
+            closeProductDialog: state.closeProductDialog,
+            setCategoryFormData: state.setCategoryFormData,
+            setProductFormData: state.setProductFormData,
+        }))
+    );
+}
+
+export function useCategoryDialogActions() {
+    return useUIStore(
+        useShallow((state) => ({
+            openCategoryCreate: state.openCategoryCreate,
+            openCategoryEdit: state.openCategoryEdit,
+        }))
+    );
+}
+
+export function useProductDialogActions() {
+    return useUIStore(
+        useShallow((state) => ({
+            openProductCreate: state.openProductCreate,
+            openProductEdit: state.openProductEdit,
+        }))
+    );
+}
+
+export function useStorefrontProductDialogState() {
+    return useUIStore(
+        useShallow((state) => ({
+            isOpen: state.isStorefrontProductDialogOpen,
+            itemId: state.storefrontProductDialogItemId,
+            open: state.openStorefrontProductDialog,
+            close: state.closeStorefrontProductDialog,
+        }))
+    );
+}
+
+export function useCartProductDialogState() {
+    return useUIStore(
+        useShallow((state) => ({
+            isOpen: state.isCartProductDialogOpen,
+            itemId: state.cartProductDialogItemId,
+            open: state.openCartProductDialog,
+            close: state.closeCartProductDialog,
+        }))
+    );
+}
 
 export type { CategoryDialogFormData, ProductDialogFormData };

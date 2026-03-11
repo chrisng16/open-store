@@ -88,20 +88,11 @@ async def get_store_by_slug(
         raise HTTPException(status_code=404, detail="Store not found")
     return store
 
-@router.get("/{store_id}", response_model=StorePublicResponse)
+@router.get("/{store_id}", response_model=StoreResponse)
 async def get_store_by_id(
-    store_id: str,
-    db: AsyncSession = Depends(get_db),
+    ctx: StoreContext = Depends(get_store_context),
 ):
-    result = await db.execute(
-        select(Store)
-        .options(selectinload(Store.business_hour_entries))
-        .where(Store.id == store_id)
-    )
-    store = result.scalar_one_or_none()
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
-    return store
+    return ctx.store
 
 
 @router.patch("/{store_id}", response_model=StoreResponse)

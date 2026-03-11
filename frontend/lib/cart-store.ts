@@ -1,14 +1,14 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useShallow } from "zustand/react/shallow";
 
 export type CartOption = {
     option_id: string;
-    option_name: string;
-    unit_amount: number;
+    option_name?: string;
     quantity: number;
-    // optional snapshot of the list this option belonged to (helps edit flows)
     option_list_id?: string;
 };
 
@@ -16,12 +16,9 @@ export type CartItem = {
     id: string; // unique cart item id
     product_id: string;
     product_name: string;
-    unit_amount: number;
     quantity: number;
     options: CartOption[];
     image_url?: string | null;
-    // optional snapshot of the product's option lists so items are editable
-    product_option_lists?: any[];
 };
 
 type CartState = {
@@ -33,7 +30,6 @@ type CartState = {
     updateItem: (id: string, patch: Partial<CartItem>) => void;
     clearCart: () => void;
     setStoreSlug: (slug: string) => void;
-    getSubtotal: () => number;
     getItemCount: () => number;
 };
 
@@ -46,27 +42,26 @@ function normalizeCartItem(item: Partial<CartItem>): CartItem {
         id: item.id ?? generateId(),
         product_id: item.product_id ?? "",
         product_name: item.product_name ?? "",
-        unit_amount: Number(item.unit_amount ?? 0),
         quantity: Math.max(1, Number(item.quantity ?? 1)),
         options: Array.isArray(item.options)
             ? item.options.map((option) => ({
                 option_id: option.option_id,
                 option_name: option.option_name,
-                unit_amount: Number(option.unit_amount ?? 0),
                 quantity: Math.max(0, Number(option.quantity ?? 0)),
                 option_list_id: option.option_list_id,
             }))
             : [],
         image_url: item.image_url ?? null,
-        product_option_lists: Array.isArray(item.product_option_lists)
-            ? item.product_option_lists
-            : undefined,
     };
 }
 
 function normalizeItems(items: unknown): CartItem[] {
     if (!Array.isArray(items)) return [];
     return items.map((item) => normalizeCartItem((item ?? {}) as Partial<CartItem>));
+}
+
+function getCartItemCount(items: CartItem[]): number {
+    return items.reduce((count, item) => count + item.quantity, 0);
 }
 
 export const useCartStore = create<CartState>()(
@@ -87,10 +82,16 @@ export const useCartStore = create<CartState>()(
 
             addItem: (item) => {
                 const normalizedItem = normalizeCartItem(item);
+                const normalizeOptionsSignature = (options: CartOption[]) =>
+                    [...options]
+                        .sort((a, b) => a.option_id.localeCompare(b.option_id))
+                        .map((option) => `${option.option_id}:${option.quantity}`)
+                        .join("|");
                 const existing = get().items.find(
                     (i) =>
                         i.product_id === normalizedItem.product_id &&
-                        JSON.stringify(i.options) === JSON.stringify(normalizedItem.options)
+                        normalizeOptionsSignature(i.options) ===
+                        normalizeOptionsSignature(normalizedItem.options)
                 );
                 if (existing) {
                     set({
@@ -135,9 +136,6 @@ export const useCartStore = create<CartState>()(
                                     ? Math.max(1, patch.quantity)
                                     : i.quantity,
                                 image_url: patch.image_url === undefined ? i.image_url : patch.image_url,
-                                product_option_lists: patch.product_option_lists === undefined
-                                    ? i.product_option_lists
-                                    : patch.product_option_lists,
                             }
                             : i
                     )),
@@ -146,18 +144,8 @@ export const useCartStore = create<CartState>()(
 
             clearCart: () => set({ items: [] }),
 
-            getSubtotal: () => {
-                return normalizeItems(get().items).reduce((total, item) => {
-                    const optionTotal = item.options.reduce(
-                        (sum, o) => sum + o.unit_amount * o.quantity,
-                        0
-                    );
-                    return total + (item.unit_amount + optionTotal) * item.quantity;
-                }, 0);
-            },
-
             getItemCount: () => {
-                return normalizeItems(get().items).reduce((count, item) => count + item.quantity, 0);
+                return getCartItemCount(normalizeItems(get().items));
             },
         }),
         {
@@ -174,3 +162,33 @@ export const useCartStore = create<CartState>()(
         }
     )
 );
+
+export function useCartHydrated() {
+    return useSyncExternalStore(
+        (onStoreChange) => useCartStore.persist.onFinishHydration(onStoreChange),
+        () => useCartStore.persist.hasHydrated(),
+        () => false
+    );
+}
+
+export function useCartSummary() {
+    return useCartStore(
+        useShallow((state) => ({
+            items: state.items,
+            itemCount: getCartItemCount(state.items),
+        }))
+    );
+}
+
+export function useCartMutations() {
+    return useCartStore(
+        useShallow((state) => ({
+            addItem: state.addItem,
+            removeItem: state.removeItem,
+            updateQuantity: state.updateQuantity,
+            updateItem: state.updateItem,
+            clearCart: state.clearCart,
+            setStoreSlug: state.setStoreSlug,
+        }))
+    );
+}

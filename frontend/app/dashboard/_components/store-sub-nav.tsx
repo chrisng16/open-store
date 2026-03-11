@@ -1,7 +1,12 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, FileUp, Package, ShoppingBag } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useTeamMembersQuery } from "@/queries/team";
+import { CreditCard, ExternalLink, FileUp, Package, ShoppingBag } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
 interface StoreSubNavProps {
     storeId: string;
@@ -11,10 +16,31 @@ interface StoreSubNavProps {
 }
 
 export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: StoreSubNavProps) {
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const membersQuery = useTeamMembersQuery(storeId);
+
+    useEffect(() => {
+        const supabase = createClient();
+        void supabase.auth.getUser().then(({ data }) => {
+            setCurrentUserId(data.user?.id ?? null);
+        });
+    }, []);
+
+    const isOwner = useMemo(() => {
+        if (!currentUserId || !membersQuery.data) {
+            return false;
+        }
+        const myMember = membersQuery.data.find((member) => member.userId === currentUserId);
+        return myMember?.role === "owner";
+    }, [currentUserId, membersQuery.data]);
+
     const navItems = [
         { href: `/dashboard/${storeId}/orders`, label: "Orders", icon: ShoppingBag },
         { href: `/dashboard/${storeId}/products`, label: "Products", icon: Package },
         { href: `/dashboard/${storeId}/ai-import`, label: "AI Import", icon: FileUp },
+        ...(isOwner
+            ? [{ href: `/dashboard/${storeId}/payments`, label: "Payments", icon: CreditCard }]
+            : []),
     ];
     return (
         < div className="border-b rounded-t-md bg-background-elevated/70 backdrop-blur sticky top-0 z-10" >

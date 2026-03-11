@@ -13,7 +13,7 @@ import {
 import { DataTable } from "@/components/dashboard/common/data-table";
 import { Button } from "@/components/ui/button";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
-import { useUIStore } from "@/stores/ui-store";
+import { useCategoryDialogActions } from "@/stores/ui-store";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { use, useMemo, useState } from "react";
@@ -29,7 +29,7 @@ export default function CategoriesPage({
     const [categoryToDelete, setCategoryToDelete] = useState<CategoryRow | null>(null);
     const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
     const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
-    const { openCategoryCreate, openCategoryEdit } = useUIStore();
+    const { openCategoryCreate, openCategoryEdit } = useCategoryDialogActions();
 
     const { data, isPending, refetch } = useQuery({
         queryKey: ["store-categories", storeId],

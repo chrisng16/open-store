@@ -12,6 +12,7 @@ from app.schemas.product import (
     CategoryCreate,
     CategoryUpdate,
     CategoryResponse,
+    ProductListItemResponse,
     ProductCreate,
     ProductUpdate,
     ProductResponse,
@@ -87,7 +88,7 @@ async def delete_category(
 # --- Products ---
 
 
-@router.get("/products", response_model=list[ProductResponse])
+@router.get("/products", response_model=list[ProductListItemResponse])
 async def list_products(
     store_id: uuid.UUID,
     category_id: uuid.UUID | None = None,
@@ -96,7 +97,6 @@ async def list_products(
     query = (
         select(Product)
         .where(Product.store_id == store_id, Product.is_active == True)
-        .options(selectinload(Product.option_lists).selectinload(OptionList.options))
         .order_by(Product.sort_order)
     )
     if category_id:

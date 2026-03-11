@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { denormalizeRequest } from "@/lib/normalize-response";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
 type StoreSettings = {
@@ -83,30 +84,11 @@ export default function SettingsPage({
         },
     });
 
-    const stripeConnectMutation = useMutation({
-        mutationFn: async () => {
-            return fetchWithAccessToken<{ url: string }>(
-                `/payments/stores/${storeId}/stripe/onboard`,
-                {
-                    method: "POST",
-                }
-            );
-        },
-        onSuccess: (data) => {
-            window.location.href = data.url;
-        },
-    });
-
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();
         if (!storeId) return;
         setMessage(null);
         await saveMutation.mutateAsync();
-    }
-
-    async function handleStripeConnect() {
-        if (!storeId) return;
-        await stripeConnectMutation.mutateAsync();
     }
 
     if (isPending)
@@ -219,51 +201,21 @@ export default function SettingsPage({
                 <CardHeader>
                     <CardTitle>Payments — Stripe Connect</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    {store?.stripeOnboardingComplete ? (
-                        <div className="flex items-center gap-2">
-                            <Badge variant="default">Connected</Badge>
-                            <p className="text-sm text-muted-foreground">
-                                Stripe account is active. Payments are enabled.
-                            </p>
-                        </div>
-                    ) : store?.stripeAccountId ? (
-                        <div>
-                            <p className="text-sm text-muted-foreground">
-                                Stripe onboarding not yet complete.
-                            </p>
-                            <Button
-                                className="mt-3"
-                                variant="outline"
-                                onClick={handleStripeConnect}
-                                disabled={stripeConnectMutation.isPending}
-                            >
-                                {stripeConnectMutation.isPending ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                )}
-                                Continue Onboarding
-                            </Button>
-                        </div>
-                    ) : (
-                        <div>
-                            <p className="mb-3 text-sm text-muted-foreground">
-                                Connect your Stripe account to accept payments from customers.
-                            </p>
-                            <Button
-                                onClick={handleStripeConnect}
-                                disabled={stripeConnectMutation.isPending}
-                            >
-                                {stripeConnectMutation.isPending ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                )}
-                                Connect Stripe Account
-                            </Button>
-                        </div>
-                    )}
+                <CardContent className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Badge variant={store?.stripeOnboardingComplete ? "default" : "secondary"}>
+                            {store?.stripeOnboardingComplete ? "Connected" : "Setup Required"}
+                        </Badge>
+                        <p className="text-sm text-muted-foreground">
+                            Manage Stripe onboarding and payment status in the Payments dashboard.
+                        </p>
+                    </div>
+                    <Link href={`/dashboard/${storeId}/payments`}>
+                        <Button variant="outline">
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Manage Payments
+                        </Button>
+                    </Link>
                 </CardContent>
             </Card>
         </div>

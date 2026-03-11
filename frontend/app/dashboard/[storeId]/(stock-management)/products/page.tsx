@@ -10,7 +10,7 @@ import {
 } from "@/components/dashboard/common/products-table-columns";
 import { Button } from "@/components/ui/button";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
-import { useUIStore } from "@/stores/ui-store";
+import { useProductDialogActions } from "@/stores/ui-store";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { use, useMemo, useState } from "react";
@@ -23,6 +23,8 @@ type Category = {
     sortOrder: number;
 };
 
+type ProductDetail = ProductRow;
+
 export default function MenuEditorPage({
     params,
 }: {
@@ -33,6 +35,7 @@ export default function MenuEditorPage({
     const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
     const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
     const { openProductCreate, openProductEdit } = useUIStore();
+    const { openProductCreate, openProductEdit } = useProductDialogActions();
 
     const { data, isPending, refetch } = useQuery({
         queryKey: ["menu-editor", storeId],
@@ -96,30 +99,47 @@ export default function MenuEditorPage({
             getProductsTableColumns({
                 categories: categoryOptions,
                 onEdit: (product) => {
-                    const selectedCategoryName =
-                        categoryOptions.find((category) => category.id === product.categoryId)?.name ?? "";
+                    void (async () => {
+                        let editableProduct: ProductRow = product;
+                        try {
+                            const fetched = await fetchWithAccessToken<ProductDetail>(
+                                `/stores/${storeId}/products/${product.id}`
+                            );
+                            editableProduct = fetched;
+                        } catch (error) {
+                            toast.error(
+                                error instanceof Error
+                                    ? error.message
+                                    : "Failed to load product details"
+                            );
+                            return;
+                        }
 
-                    openProductEdit({
-                        id: product.id,
-                        name: product.name,
-                        description: product.description ?? "",
-                        basePrice: String((product.unitAmount ?? 0) / 100),
-                        imageUrl: product.imageUrl ?? "",
-                        categoryId: product.categoryId ?? "",
-                        categoryName: selectedCategoryName,
-                        optionLists: (product.optionLists ?? []).map((group) => ({
-                            name: group.name,
-                            minNumOptions: group.minNumOptions,
-                            maxNumOptions: group.maxNumOptions,
-                            isOptional: group.isOptional,
-                            options: group.options.map((option) => ({
-                                name: option.name,
-                                unitAmount: String((option.unitAmount ?? 0) / 100),
-                                isDefault: option.isDefault,
-                                sortOrder: option.sortOrder,
+                        const selectedCategoryName =
+                            categoryOptions.find((category) => category.id === editableProduct.categoryId)?.name ?? "";
+
+                        openProductEdit({
+                            id: editableProduct.id,
+                            name: editableProduct.name,
+                            description: editableProduct.description ?? "",
+                            basePrice: String((editableProduct.unitAmount ?? 0) / 100),
+                            imageUrl: editableProduct.imageUrl ?? "",
+                            categoryId: editableProduct.categoryId ?? "",
+                            categoryName: selectedCategoryName,
+                            optionLists: (editableProduct.optionLists ?? []).map((group) => ({
+                                name: group.name,
+                                minNumOptions: group.minNumOptions,
+                                maxNumOptions: group.maxNumOptions,
+                                isOptional: group.isOptional,
+                                options: group.options.map((option) => ({
+                                    name: option.name,
+                                    unitAmount: String((option.unitAmount ?? 0) / 100),
+                                    isDefault: option.isDefault,
+                                    sortOrder: option.sortOrder,
+                                })),
                             })),
-                        })),
-                    });
+                        });
+                    })();
                 },
                 onDelete: (product) => {
                     setProductToDelete(product);

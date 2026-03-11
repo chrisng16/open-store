@@ -7,19 +7,18 @@ from app.database import get_db
 from app.api.deps import get_current_user, get_store_context, require_role, CurrentUser, StoreContext
 from app.models.store import Store, MemberRole
 from app.config import get_settings
+from app.schemas.payment import CreatePaymentIntentRequest
 from app.services.stripe_service import (
     create_connect_account,
     create_account_link,
+    create_account_login_link,
     get_account_status,
     create_payment_intent,
 )
 
 router = APIRouter(tags=["payments"])
 
-
 # --- Stripe Connect onboarding ---
-
-
 @router.post("/stores/{store_id}/stripe/onboard")
 async def onboard_stripe(
     ctx: StoreContext = Depends(require_role(MemberRole.owner)),
@@ -35,8 +34,8 @@ async def onboard_stripe(
 
     link = await create_account_link(
         store.stripe_account_id,
-        refresh_url=f"{settings.frontend_url}/dashboard/{store.id}/settings",
-        return_url=f"{settings.frontend_url}/dashboard/{store.id}/settings?stripe=complete",
+        refresh_url=f"{settings.frontend_url}/dashboard/{store.id}/payments?stripe=refresh",
+        return_url=f"{settings.frontend_url}/dashboard/{store.id}/payments?stripe=complete",
     )
     return {"url": link.url}
 
@@ -48,36 +47,70 @@ async def stripe_status(
 ):
     store = ctx.store
     if not store.stripe_account_id:
-        return {"connected": False, "details_submitted": False, "charges_enabled": False}
+        return {
+            "connected": False,
+            "details_submitted": False,
+            "charges_enabled": False,
+            "payouts_enabled": False,
+            "restricted": False,
+            "requirements": {
+                "currently_due": [],
+                "eventually_due": [],
+                "disabled_reason": None,
+            },
+            "capabilities": {"card_payments": None, "transfers": None},
+        }
 
     status = await get_account_status(store.stripe_account_id)
+    print("Stripe account status:", status)
     store.stripe_onboarding_complete = status["charges_enabled"]
     await db.flush()
 
     return status
 
 
+@router.post("/stores/{store_id}/stripe/login-link")
+async def stripe_login_link(
+    ctx: StoreContext = Depends(require_role(MemberRole.owner)),
+):
+    store = ctx.store
+    if not store.stripe_account_id:
+        raise HTTPException(status_code=400, detail="Store not set up for payments")
+
+    link = await create_account_login_link(store.stripe_account_id)
+    return {"url": link.url}
+
+
 # --- Payment Intent ---
-
-
 @router.post("/payments/create-intent")
 async def create_intent(
-    store_id: uuid.UUID,
-    amount: int,  # in cents
+    payload: CreatePaymentIntentRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Store).where(Store.id == store_id))
+    result = await db.execute(select(Store).where(Store.id == payload.store_id))
     store = result.scalar_one_or_none()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-    if not store.stripe_account_id or not store.stripe_onboarding_complete:
+
+    if not store.stripe_account_id:
         raise HTTPException(status_code=400, detail="Store not set up for payments")
 
+    live_status = await get_account_status(store.stripe_account_id)
+    store.stripe_onboarding_complete = bool(live_status.get("charges_enabled"))
+    await db.flush()
+
+    if not live_status.get("charges_enabled"):
+        raise HTTPException(status_code=400, detail="Store not set up for payments")
+
+    transfers_capability = (live_status.get("capabilities") or {}).get("transfers")
+    if transfers_capability and transfers_capability != "active":
+        raise HTTPException(status_code=400, detail="Store transfer capability is not active")
+
     settings = get_settings()
-    fee = int(amount * settings.stripe_platform_fee_percent / 100)
+    fee = int(payload.amount * settings.stripe_platform_fee_percent / 100)
 
     intent = await create_payment_intent(
-        amount=amount,
+        amount=payload.amount,
         currency="usd",
         destination_account=store.stripe_account_id,
         application_fee=fee,
@@ -101,7 +134,7 @@ async def stripe_webhook(
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, settings.stripe_webhook_secret)
-    except (ValueError, stripe.error.SignatureVerificationError):
+    except (ValueError, stripe.SignatureVerificationError):
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
     if event["type"] == "payment_intent.succeeded":

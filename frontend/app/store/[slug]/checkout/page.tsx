@@ -7,7 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
-import { useCartStore } from "@/lib/cart-store";
+import { useCartPricing } from "@/lib/cart-pricing";
+import { useCartMutations, useCartSummary } from "@/lib/cart-store";
+import { useStore } from "@/lib/store-context";
 import { getStripe } from "@/lib/stripe";
 import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
 import { useTheme } from "next-themes";
@@ -20,13 +22,13 @@ const stripePromise = getStripe();
 export default function CheckoutPage() {
     const params = useParams<{ slug: string }>();
     const slug = params.slug;
-    const items = useCartStore((s) => s.items);
-    const getSubtotal = useCartStore((s) => s.getSubtotal);
-    const clearCart = useCartStore((s) => s.clearCart);
-
-    const subtotal = getSubtotal();
-    const tax = Math.round(subtotal * 0.08);
-    const total = subtotal + tax;
+    const store = useStore();
+    const { items } = useCartSummary();
+    const { clearCart } = useCartMutations();
+    const { pricedItems, subtotal, tax, total, isLoading, error } = useCartPricing({
+        storeId: store.id,
+        items,
+    });
 
     if (items.length === 0) {
         return (
@@ -50,11 +52,14 @@ export default function CheckoutPage() {
         <Elements stripe={stripePromise}>
             <CheckoutForm
                 slug={slug}
-                items={items}
+                storeId={store.id}
+                items={pricedItems}
                 subtotal={subtotal}
                 tax={tax}
                 total={total}
                 clearCart={clearCart}
+                isPricingLoading={isLoading}
+                pricingError={error}
             />
         </Elements>
     );
@@ -62,18 +67,37 @@ export default function CheckoutPage() {
 
 function CheckoutForm({
     slug,
+    storeId,
     items,
     subtotal,
     tax,
     total,
     clearCart,
+    isPricingLoading,
+    pricingError,
 }: {
     slug: string;
-    items: ReturnType<typeof useCartStore.getState>["items"];
+    storeId: string;
+    items: {
+        id: string;
+        product_id: string;
+        product_name: string;
+        quantity: number;
+        unit_amount: number;
+        options: {
+            option_id: string;
+            option_name: string;
+            unit_amount: number;
+            quantity: number;
+        }[];
+        line_total: number;
+    }[];
     subtotal: number;
     tax: number;
     total: number;
     clearCart: () => void;
+    isPricingLoading: boolean;
+    pricingError: string | null;
 }) {
     const stripe = useStripe();
     const elements = useElements();
@@ -133,14 +157,18 @@ function CheckoutForm({
                 product_name: item.product_name,
                 quantity: item.quantity,
                 unit_amount: item.unit_amount,
-                options: item.options,
+                options: item.options.map((option) => ({
+                    option_id: option.option_id,
+                    option_name: option.option_name,
+                    unit_amount: option.unit_amount,
+                    quantity: option.quantity,
+                })),
             }));
 
-            const store = (await api.stores.getBySlug(slug)) as { id: string };
             const amountInCents = total;
 
             const paymentIntent = (await api.payments.createIntent(
-                store.id,
+                storeId,
                 amountInCents
             )) as { client_secret: string; payment_intent_id: string };
 
@@ -166,7 +194,7 @@ function CheckoutForm({
                 throw new Error("Payment was not completed. Please try again.");
             }
 
-            const order = (await api.orders.create(store.id, {
+            const order = (await api.orders.create(storeId, {
                 customer_name: name || null,
                 customer_email: email || null,
                 customer_phone: phone || null,
@@ -263,30 +291,28 @@ function CheckoutForm({
                             <CardTitle>Order Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {items.map((item) => (
-                                <div key={item.id} className="flex justify-between gap-3 text-sm">
-                                    <span>
-                                        {item.quantity}x {item.product_name}
-                                        {item.options.length > 0 && (
-                                            <span className="text-muted-foreground">
-                                                {" "}
-                                                ({item.options.map((option) => option.option_name).join(", ")})
-                                            </span>
-                                        )}
-                                    </span>
-                                    <span className="shrink-0">
-                                        $
-                                        {(
-                                            (item.unit_amount +
-                                                item.options.reduce(
-                                                    (s, option) => s + option.unit_amount * option.quantity,
-                                                    0
-                                                )) *
-                                            item.quantity
-                                            / 100).toFixed(2)}
-                                    </span>
-                                </div>
-                            ))}
+                            {isPricingLoading ? (
+                                <>
+                                    <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                                    <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                                    <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                                </>
+                            ) : (
+                                items.map((item) => (
+                                    <div key={item.id} className="flex justify-between gap-3 text-sm">
+                                        <span>
+                                            {item.quantity}x {item.product_name}
+                                            {item.options.length > 0 && (
+                                                <span className="text-muted-foreground">
+                                                    {" "}
+                                                    ({item.options.map((option) => option.option_name).join(", ")})
+                                                </span>
+                                            )}
+                                        </span>
+                                        <span className="shrink-0">${(item.line_total / 100).toFixed(2)}</span>
+                                    </div>
+                                ))
+                            )}
 
                             <Separator className="my-2" />
 
@@ -306,14 +332,19 @@ function CheckoutForm({
                     </Card>
 
                     {error && <p className="text-sm text-destructive">{error}</p>}
+                    {pricingError && <p className="text-sm text-destructive">{pricingError}</p>}
 
                     <Button
                         type="submit"
                         className="w-full rounded-full"
                         size="lg"
-                        disabled={loading || !stripe || !elements}
+                        disabled={loading || !stripe || !elements || isPricingLoading || !!pricingError}
                     >
-                        {loading ? "Processing payment..." : `Pay & Place Order · $${(total / 100).toFixed(2)}`}
+                        {loading
+                            ? "Processing payment..."
+                            : isPricingLoading
+                                ? "Refreshing prices..."
+                                : `Pay & Place Order · $${(total / 100).toFixed(2)}`}
                     </Button>
                 </div>
             </form>

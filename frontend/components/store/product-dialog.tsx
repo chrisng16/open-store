@@ -3,17 +3,18 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import type { CartItem, CartOption } from "@/lib/cart-store";
+import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/lib/api";
+import type { CartItem } from "@/lib/cart-store";
 import { cn } from "@/lib/utils";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Minus, Plus } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useMemo, useState } from "react";
-import { Input } from "../ui/input";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Option = {
     id: string;
@@ -45,9 +46,13 @@ export type ProductDialogProduct = {
     option_lists: OptionList[];
 };
 
-// ─── Selection helpers ────────────────────────────────────────────────────────
-
 type Selections = Record<string, Record<string, number>>;
+
+type ProductPreview = {
+    name?: string;
+    description?: string | null;
+    image_url?: string | null;
+};
 
 function groupTotal(sel: Selections, groupId: string) {
     return Object.values(sel[groupId] ?? {}).reduce((s, n) => s + n, 0);
@@ -76,7 +81,16 @@ function totalPrice(product: ProductDialogProduct, sel: Selections, qty: number)
     return (product.unit_amount + extra) * qty;
 }
 
-// ─── Quantity stepper ─────────────────────────────────────────────────────────
+function deriveSelectionsFromCartItem(cartItem?: CartItem): Selections {
+    if (!cartItem) return {};
+    const out: Selections = {};
+    for (const option of cartItem.options) {
+        const listId = option.option_list_id ?? "default";
+        out[listId] = out[listId] ?? {};
+        out[listId][option.option_id] = (out[listId][option.option_id] ?? 0) + option.quantity;
+    }
+    return out;
+}
 
 function Stepper({
     value,
@@ -104,7 +118,10 @@ function Stepper({
             </Button>
             <Input
                 tabIndex={-1}
-                className="text-center w-12 text-sm font-medium text-foreground tabular-nums" value={value} onChange={(e) => onValueChange(Math.min(Number(e.target.value), 14))} />
+                className="w-12 text-center text-sm font-medium text-foreground tabular-nums"
+                value={value}
+                onChange={(e) => onValueChange(Math.min(Math.max(Number(e.target.value) || 1, 1), 14))}
+            />
             <Button
                 type="button"
                 variant="outline"
@@ -120,8 +137,6 @@ function Stepper({
     );
 }
 
-// ─── Modifier group section ───────────────────────────────────────────────────
-
 function OptionListSection({
     list,
     selections,
@@ -133,12 +148,13 @@ function OptionListSection({
 }) {
     const isOptional = list.is_optional;
     const isRadio = list.selection_node === "single_select";
-    const atMax = list.max_aggregate_options_quantity > 0 && groupTotal(selections, list.id) >= list.max_aggregate_options_quantity;
+    const atMax =
+        list.max_aggregate_options_quantity > 0 &&
+        groupTotal(selections, list.id) >= list.max_aggregate_options_quantity;
     const satisfied = isListSatisfied(list, selections);
 
     return (
         <div className="mt-6">
-            {/* Group header */}
             <div className="mb-3">
                 <h3 className="text-base font-bold">{list.name}</h3>
                 <p className="mt-0.5 text-sm text-muted-foreground">
@@ -152,24 +168,27 @@ function OptionListSection({
                             <span className={cn("font-medium", satisfied ? "text-green-600" : "text-amber-500")}>
                                 Required
                             </span>
-                            {` · Select ${list.min_num_options === list.max_num_options ? `exactly ${list.min_num_options}` : `at least ${list.min_num_options}`}`}
-                            {list.max_num_options && list.max_num_options !== list.min_num_options ? ` (up to ${list.max_num_options})` : ""}
+                            {` · Select ${list.min_num_options === list.max_num_options
+                                ? `exactly ${list.min_num_options}`
+                                : `at least ${list.min_num_options}`
+                                }`}
+                            {list.max_num_options && list.max_num_options !== list.min_num_options
+                                ? ` (up to ${list.max_num_options})`
+                                : ""}
                         </>
                     )}
                 </p>
             </div>
 
-            {/* Radio group (max === 1) */}
             {isRadio ? (
                 <RadioGroup
                     value={Object.entries(selections[list.id] ?? {}).find(([, v]) => v > 0)?.[0] ?? ""}
                     onValueChange={(optionId) => {
-                        // Deselect previous, select new
                         const prev = Object.entries(selections[list.id] ?? {}).find(([, v]) => v > 0)?.[0];
                         if (prev && prev !== optionId) onChange(list.id, prev, -1);
                         onChange(list.id, optionId, 1);
                     }}
-                    className="divide-y rounded-md border border-border/70 bg-card gap-0"
+                    className="divide-y gap-0 rounded-md border border-border/70 bg-card"
                 >
                     {list.options.map((option) => (
                         <div key={option.id} className="flex items-center gap-4 px-4 py-3">
@@ -186,8 +205,7 @@ function OptionListSection({
                     ))}
                 </RadioGroup>
             ) : isOptional ? (
-                // Checkbox group (optional multi-select)
-                <div className="divide-y rounded-md border border-border/70 bg-card gap-0">
+                <div className="divide-y gap-0 rounded-md border border-border/70 bg-card">
                     {list.options.map((option) => {
                         const checked = (selections[list.id]?.[option.id] ?? 0) > 0;
                         return (
@@ -198,10 +216,13 @@ function OptionListSection({
                                     disabled={!checked && atMax}
                                     onCheckedChange={(v) => onChange(list.id, option.id, v ? 1 : -1)}
                                 />
-                                <Label htmlFor={`check-${option.id}`} className="flex-1 flex-col justify-start items-start cursor-pointer gap-0">
+                                <Label
+                                    htmlFor={`check-${option.id}`}
+                                    className="flex flex-1 cursor-pointer flex-col items-start justify-start gap-0"
+                                >
                                     <span className="text-sm font-medium">{option.name}</span>
                                     {option.unit_amount !== 0 && (
-                                        <span className="text-xs text-muted-foreground leading-tight">
+                                        <span className="text-xs leading-tight text-muted-foreground">
                                             {option.unit_amount > 0 ? "+" : ""}${(option.unit_amount / 100).toFixed(2)}
                                         </span>
                                     )}
@@ -211,7 +232,6 @@ function OptionListSection({
                     })}
                 </div>
             ) : (
-                // Stepper group (required, allows multiples — e.g. DoorDash Step 1/2)
                 <div className="divide-y rounded-4xl border border-border/70 bg-card">
                     {list.options.map((option) => {
                         const qty = selections[list.id]?.[option.id] ?? 0;
@@ -227,7 +247,7 @@ function OptionListSection({
                                 </div>
                                 <Stepper
                                     value={qty}
-                                    onValueChange={(v) => onChange(list.id, option.id, qty)}
+                                    onValueChange={(v) => onChange(list.id, option.id, v - qty)}
                                     canDecrement={qty > 0}
                                     canIncrement={!atMax}
                                 />
@@ -240,46 +260,128 @@ function OptionListSection({
     );
 }
 
-// ─── Main dialog ──────────────────────────────────────────────────────────────
+function ProductDialogSkeleton({ preview }: { preview?: ProductPreview }) {
+    return (
+        <>
+            <div className="aspect-video w-full overflow-hidden">
+                {preview?.image_url ? (
+                    <Image
+                        src={preview.image_url}
+                        alt={preview.name ?? "Product"}
+                        width={640}
+                        height={360}
+                        className="h-full w-full object-cover opacity-75"
+                    />
+                ) : (
+                    <Skeleton className="h-full w-full" />
+                )}
+            </div>
+            <div className="px-5 pb-4 pt-5 sm:px-6">
+                <DialogHeader className="mb-3 text-left">
+                    {preview?.name ? (
+                        <DialogTitle className="text-2xl font-bold tracking-tight">
+                            {preview.name}
+                        </DialogTitle>
+                    ) : (
+                        <>
+                            <DialogTitle className="sr-only">Loading product</DialogTitle>
+                            <Skeleton className="h-8 w-48" aria-hidden="true" />
+                        </>
+                    )}
+                    {preview?.description ? (
+                        <DialogDescription>{preview.description}</DialogDescription>
+                    ) : (
+                        <>
+                            <DialogDescription className="sr-only">
+                                Loading product details
+                            </DialogDescription>
+                            <Skeleton className="h-4 w-64" aria-hidden="true" />
+                        </>
+                    )}
+                </DialogHeader>
+                <div className="h-4" />
+            </div>
+
+            <Separator />
+            <div className="bg-background px-5 py-4 sm:px-6">
+                <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-32 rounded-full" />
+                    <Skeleton className="h-10 flex-1 rounded-full" />
+                </div>
+            </div>
+        </>
+    );
+}
 
 export function ProductDialog({
-    product,
+    open = true,
+    productId,
+    storeId,
     onClose,
     onAddToCart,
-    // optional: editing existing cart item
     cartItem,
     onSaveEdit,
     initialQty,
     initialSelections,
+    preview,
 }: {
-    product: ProductDialogProduct;
+    open?: boolean;
+    productId: string;
+    storeId: string;
     onClose: () => void;
     onAddToCart?: (product: ProductDialogProduct, selections: Selections, qty: number) => void;
     cartItem?: CartItem;
-    onSaveEdit?: (id: string, selections: Selections, qty: number) => void;
+    onSaveEdit?: (
+        id: string,
+        selections: Selections,
+        qty: number,
+        product: ProductDialogProduct
+    ) => void;
     initialQty?: number;
     initialSelections?: Selections;
+    preview?: ProductPreview;
 }) {
-    const derivedInitialQty = initialQty ?? cartItem?.quantity ?? 1;
-    const derivedInitialSelections: Selections = useMemo(() => {
-        if (initialSelections) return initialSelections;
-        if (!cartItem) return {};
-        const out: Selections = {};
-        for (const option of cartItem.options as CartOption[]) {
-            const listId = option.option_list_id ?? "default";
-            out[listId] = out[listId] ?? {};
-            out[listId][option.option_id] = (out[listId][option.option_id] ?? 0) + option.quantity;
-        }
-        return out;
-    }, [initialSelections, cartItem]);
+    const queryClient = useQueryClient();
 
-    const [qty, setQty] = useState<number>(derivedInitialQty);
-    const [selections, setSelections] = useState<Selections>(derivedInitialSelections);
+    const [qty, setQty] = useState<number>(initialQty ?? cartItem?.quantity ?? 1);
+    const [selections, setSelections] = useState<Selections>(
+        initialSelections ?? deriveSelectionsFromCartItem(cartItem)
+    );
+
+    useEffect(() => {
+        setQty(initialQty ?? cartItem?.quantity ?? 1);
+        setSelections(initialSelections ?? deriveSelectionsFromCartItem(cartItem));
+    }, [cartItem, initialQty, initialSelections, productId]);
+
+    const productQueryKey = useMemo(
+        () => ["store-product", storeId, productId] as const,
+        [storeId, productId]
+    );
+
+    const {
+        data: product,
+        error,
+        isPending,
+        isFetching,
+    } = useQuery<ProductDialogProduct>({
+        queryKey: productQueryKey,
+        queryFn: () => api.products.get(storeId, productId) as Promise<ProductDialogProduct>,
+        enabled: open && !!storeId && !!productId,
+        initialData: () => queryClient.getQueryData<ProductDialogProduct>(productQueryKey),
+        staleTime: 0,
+        refetchOnMount: true,
+    });
+
+    const isLoading = isPending && !product;
+    const loadError = error instanceof Error ? error.message : error ? "Failed to load product details" : null;
 
     const handleModifierChange = useCallback(
         (listId: string, optionId: string, delta: number) => {
+            if (!product) return;
             setSelections((prev) => {
-                const list = product.option_lists.find((g) => g.id === listId)!;
+                const list = product.option_lists.find((group) => group.id === listId);
+                if (!list) return prev;
+
                 const isRadio = list.selection_node === "single_select";
                 const groupSel = { ...(prev[listId] ?? {}) };
 
@@ -291,25 +393,28 @@ export function ProductDialog({
                 return { ...prev, [listId]: groupSel };
             });
         },
-        [product.option_lists],
+        [product]
     );
 
-    const allSatisfied = useMemo(
-        () => product.option_lists.every((g) => isListSatisfied(g, selections)),
-        [product.option_lists, selections],
-    );
+    const allSatisfied = useMemo(() => {
+        if (!product) return false;
+        return product.option_lists.every((group) => isListSatisfied(group, selections));
+    }, [product, selections]);
 
-    const price = useMemo(() => totalPrice(product, selections, qty), [product, selections, qty]);
+    const price = useMemo(() => {
+        if (!product) return 0;
+        return totalPrice(product, selections, qty);
+    }, [product, selections, qty]);
 
-    const unsatisfiedCount = useMemo(
-        () => product.option_lists.filter((g) => !isListSatisfied(g, selections)).length,
-        [product.option_lists, selections],
-    );
+    const unsatisfiedCount = useMemo(() => {
+        if (!product) return 0;
+        return product.option_lists.filter((group) => !isListSatisfied(group, selections)).length;
+    }, [product, selections]);
 
     const handleAdd = () => {
-        if (!allSatisfied) return;
+        if (!product || !allSatisfied) return;
         if (onSaveEdit && cartItem) {
-            onSaveEdit(cartItem.id, selections, qty);
+            onSaveEdit(cartItem.id, selections, qty, product);
             onClose();
             return;
         }
@@ -318,69 +423,85 @@ export function ProductDialog({
     };
 
     return (
-        <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
             <DialogContent
-                closeButtonClassName="rounded-full p-1 bg-accent opacity-90"
-                className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden rounded-xl border border-border/70 p-0 sm:max-w-lg">
-                {/* Scrollable body */}
-                <div className="flex-1 overflow-y-auto">
-                    <div className="aspect-video w-full overflow-hidden">
-                        <Image
-                            src={product.image_url || "https://static.photos/food/640x360/"}
-                            alt={product.name}
-                            width={640}
-                            height={360}
-                            className="h-full w-full object-cover"
-                        />
-                    </div>
+                closeButtonClassName="rounded-full bg-accent p-1 opacity-90"
+                className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden rounded-xl border border-border/70 p-0 sm:max-w-lg"
+            >
+                {isLoading && <ProductDialogSkeleton preview={preview} />}
 
-                    <div className="px-5 pb-4 pt-5 sm:px-6">
-                        <DialogHeader className="mb-1 text-left">
-                            <DialogTitle className="text-2xl font-bold tracking-tight">
-                                {product.name}
-                            </DialogTitle>
-                            <DialogDescription>
-                                {product.description}
-                            </DialogDescription>
+                {!isLoading && loadError && (
+                    <div className="p-6">
+                        <DialogHeader className="text-left">
+                            <DialogTitle>Could not load item</DialogTitle>
+                            <DialogDescription>{loadError}</DialogDescription>
                         </DialogHeader>
-
-                        {product.option_lists.map((optionList) => (
-                            <OptionListSection
-                                key={optionList.id}
-                                list={optionList}
-                                selections={selections}
-                                onChange={handleModifierChange}
-                            />
-                        ))}
-
-                        <div className="h-4" />
+                        <div className="mt-4 flex justify-end">
+                            <Button onClick={onClose}>Close</Button>
+                        </div>
                     </div>
-                </div>
+                )}
 
-                {/* Sticky footer */}
-                <Separator />
-                <div className="bg-background px-5 py-4 sm:px-6">
-                    <div className="flex items-center gap-3">
-                        <Stepper
-                            value={qty}
-                            onValueChange={(v) => setQty(v)}
-                            canDecrement={qty > 1}
-                            canIncrement={true}
-                        />
-                        <Button
-                            className={cn(
-                                "flex-1 rounded-full font-bold",
-                                allSatisfied ? "" : "bg-muted text-muted-foreground",
-                            )}
-                            disabled={!allSatisfied}
-                            onClick={handleAdd}
-                        >
-                            {allSatisfied
-                                ? `Add to cart · $${(price / 100).toFixed(2)}`
-                                : `Make ${unsatisfiedCount} required selection${unsatisfiedCount !== 1 ? "s" : ""} · $${(price / 100).toFixed(2)}`}
-                        </Button>
-                    </div>
-                </div>
+                {!isLoading && !loadError && product && (
+                    <>
+                        <div className="flex-1 overflow-y-auto">
+                            <div className="aspect-video w-full overflow-hidden relative">
+                                <Image
+                                    src={product.image_url || "https://static.photos/food/640x360/"}
+                                    alt={product.name}
+                                    width={640}
+                                    height={360}
+                                    className="h-full w-full object-cover"
+                                />
+                            </div>
+
+                            <div className="px-5 pb-4 pt-5 sm:px-6">
+                                <DialogHeader className="mb-1 text-left">
+                                    <DialogTitle className="text-2xl font-bold tracking-tight">
+                                        {product.name}
+                                    </DialogTitle>
+                                    <DialogDescription>{product.description}</DialogDescription>
+                                </DialogHeader>
+
+                                {product.option_lists.map((optionList) => (
+                                    <OptionListSection
+                                        key={optionList.id}
+                                        list={optionList}
+                                        selections={selections}
+                                        onChange={handleModifierChange}
+                                    />
+                                ))}
+
+                                <div className="h-4" />
+                            </div>
+                        </div>
+
+                        <Separator />
+                        <div className="bg-background px-5 py-4 sm:px-6">
+                            <div className="flex items-center gap-3">
+                                <Stepper
+                                    value={qty}
+                                    onValueChange={(v) => setQty(v)}
+                                    canDecrement={qty > 1}
+                                    canIncrement
+                                />
+                                <Button
+                                    className={cn(
+                                        "flex-1 rounded-full font-bold",
+                                        allSatisfied ? "" : "bg-muted text-muted-foreground"
+                                    )}
+                                    disabled={!allSatisfied}
+                                    onClick={handleAdd}
+                                >
+                                    {allSatisfied
+                                        ? `Add to cart · $${(price / 100).toFixed(2)}`
+                                        : `Make ${unsatisfiedCount} required selection${unsatisfiedCount !== 1 ? "s" : ""
+                                        } · $${(price / 100).toFixed(2)}`}
+                                </Button>
+                            </div>
+                        </div>
+                    </>
+                )}
             </DialogContent>
         </Dialog>
     );

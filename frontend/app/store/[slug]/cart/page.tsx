@@ -1,87 +1,32 @@
 "use client";
 
-import { ProductDialog, type ProductDialogProduct } from "@/components/store/product-dialog";
+import { ProductDialog } from "@/components/store/product-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { api } from "@/lib/api";
-import { useCartStore, type CartItem as CartItemType, type CartOption } from "@/lib/cart-store";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useCartPricing } from "@/lib/cart-pricing";
+import { useCartMutations, useCartSummary, type CartItem as CartItemType } from "@/lib/cart-store";
+import { useStore } from "@/lib/store-context";
 import { Edit3, Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
-function product_option_lists_from_item(item: CartItemType) {
-    type SimpleOption = {
-        id: string;
-        name: string;
-        unit_amount: number;
-        min_option_choice_quantity: number;
-        max_option_choice_quantity: number;
-        default_quantity: number;
-    };
-    const map: Record<string, { id: string; name: string; options: SimpleOption[] }> = {};
-    for (const option of item.options as CartOption[]) {
-        const listId = option.option_list_id ?? "default";
-        map[listId] = map[listId] ?? { id: listId, name: listId === "default" ? "Options" : listId, options: [] };
-        if (!map[listId].options.find((entry) => entry.id === option.option_id)) {
-            map[listId].options.push({
-                id: option.option_id,
-                name: option.option_name,
-                unit_amount: option.unit_amount,
-                min_option_choice_quantity: 0,
-                max_option_choice_quantity: 1,
-                default_quantity: 0,
-            });
-        }
-    }
-    return Object.values(map).map((entry) => ({
-        id: entry.id,
-        name: entry.name,
-        selection_node: "multi_select" as const,
-        min_num_options: 0,
-        max_num_options: entry.options.length,
-        min_aggregate_options_quantity: 0,
-        max_aggregate_options_quantity: 0,
-        is_optional: true,
-        options: entry.options,
-    }));
-}
-
 export default function CartPage() {
     const params = useParams<{ slug: string }>();
     const slug = params.slug;
-    const items = useCartStore((s) => s.items);
-    const removeItem = useCartStore((s) => s.removeItem);
-    const updateQuantity = useCartStore((s) => s.updateQuantity);
-    const updateItem = useCartStore((s) => s.updateItem);
-    const getSubtotal = useCartStore((s) => s.getSubtotal);
-
-    const subtotal = getSubtotal();
-    const tax = Math.round(subtotal * 0.08);
-    const total = subtotal + tax;
+    const store = useStore();
+    const { items } = useCartSummary();
+    const { removeItem, updateQuantity, updateItem } = useCartMutations();
+    const { pricedItems, subtotal, tax, total, isLoading, error } = useCartPricing({
+        storeId: store.id,
+        items,
+    });
     const [editItem, setEditItem] = useState<CartItemType | null>(null);
-    const [editProduct, setEditProduct] = useState<ProductDialogProduct | null>(null);
 
-    const handleEdit = async (item: CartItemType) => {
+    const handleEdit = (item: CartItemType) => {
         setEditItem(item);
-        setEditProduct(null);
-        try {
-            const store = (await api.stores.getBySlug(slug)) as { id?: string };
-            if (!store?.id) {
-                console.warn("store not found for slug", slug);
-                return;
-            }
-            try {
-                const product = await api.products.get(store.id, item.product_id);
-                setEditProduct(product as ProductDialogProduct);
-            } catch (err) {
-                console.warn("failed to fetch product for edit", err);
-                // keep editProduct null so fallback works
-            }
-        } catch (err) {
-            console.warn("failed to fetch store for edit", err);
-        }
     };
 
     if (items.length === 0) {
@@ -104,49 +49,37 @@ export default function CartPage() {
 
     return (
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-            {/* Edit dialog (supports fallback when product_modifier_groups are missing) */}
+            {/* Edit dialog loads fresh product data by id */}
             {editItem && (
                 <ProductDialog
-                    product={
-                        editProduct ?? {
-                            id: editItem.product_id,
-                            name: editItem.product_name,
-                            description: null,
-                            unit_amount: editItem.unit_amount,
-                            image_url: editItem.image_url ?? null,
-                            option_lists: editItem.product_option_lists ?? [],
-                        }
-                    }
+                    productId={editItem.product_id}
+                    storeId={store.id}
+                    preview={{
+                        name: editItem.product_name,
+                        image_url: editItem.image_url ?? null,
+                    }}
                     cartItem={editItem}
-                    onSaveEdit={(id, selections, qty) => {
-                        // convert selections back to options array
-                        type List = {
-                            id: string;
-                            options: { id: string; name: string; unit_amount: number }[];
-                        };
-                        const optionLists: List[] = (editProduct?.option_lists ?? editItem.product_option_lists ?? product_option_lists_from_item(editItem)) as List[];
-                        const options = optionLists.flatMap((list) =>
-                            list.options.flatMap((option) => {
-                                const selectedCount = selections[list.id]?.[option.id] ?? 0;
+                    onSaveEdit={(id, selections, qty, product) => {
+                        const options = Object.entries(selections).flatMap(([listId, optionMap]) =>
+                            Object.entries(optionMap).flatMap(([optionId, selectedCount]) => {
                                 if (selectedCount <= 0) return [];
-
-                                return Array.from({ length: selectedCount }, () => ({
-                                    option_id: option.id,
-                                    option_name: option.name,
-                                    unit_amount: Number(option.unit_amount),
-                                    quantity: 1,
-                                    option_list_id: list.id,
-                                }));
+                                const current = product.option_lists
+                                    .find((list) => list.id === listId)
+                                    ?.options.find((opt) => opt.id === optionId);
+                                return [{
+                                    option_id: optionId,
+                                    option_name: current?.name,
+                                    quantity: selectedCount,
+                                    option_list_id: listId,
+                                }];
                             })
                         );
 
                         updateItem(id, { quantity: qty, options });
                         setEditItem(null);
-                        setEditProduct(null);
                     }}
                     onClose={() => {
                         setEditItem(null);
-                        setEditProduct(null);
                     }}
                 />
             )}
@@ -158,15 +91,22 @@ export default function CartPage() {
 
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
                 <div className="space-y-3">
-                    {items.map((item) => (
-                        <CartItemRow
-                            key={item.id}
-                            item={item}
-                            onRemove={() => removeItem(item.id)}
-                            onUpdateQuantity={(qty) => updateQuantity(item.id, qty)}
-                            onEdit={() => handleEdit(item)}
-                        />
-                    ))}
+                    {isLoading ? (
+                        <>
+                            <Skeleton className="h-24 w-full rounded-[1.75rem]" />
+                            <Skeleton className="h-24 w-full rounded-[1.75rem]" />
+                        </>
+                    ) : (
+                        pricedItems.map((item) => (
+                            <CartItemRow
+                                key={item.id}
+                                item={item}
+                                onRemove={() => removeItem(item.id)}
+                                onUpdateQuantity={(qty) => updateQuantity(item.id, qty)}
+                                onEdit={() => handleEdit(item)}
+                            />
+                        ))
+                    )}
                 </div>
 
                 <div className="rounded-[2rem] border border-border/70 bg-card p-5 shadow-sm lg:sticky lg:top-28">
@@ -174,11 +114,11 @@ export default function CartPage() {
                     <div className="mt-4 space-y-3 text-sm">
                         <div className="flex justify-between">
                             <span>Subtotal</span>
-                            <span>${(subtotal / 100).toFixed(2)}</span>
+                            {isLoading ? <Skeleton className="h-4 w-16" /> : <span>${(subtotal / 100).toFixed(2)}</span>}
                         </div>
                         <div className="flex justify-between text-muted-foreground">
                             <span>Tax (8%)</span>
-                            <span>${(tax / 100).toFixed(2)}</span>
+                            {isLoading ? <Skeleton className="h-4 w-12" /> : <span>${(tax / 100).toFixed(2)}</span>}
                         </div>
                         <div className="flex justify-between text-muted-foreground">
                             <span>Pickup fee</span>
@@ -187,9 +127,13 @@ export default function CartPage() {
                         <Separator />
                         <div className="flex justify-between text-lg font-semibold">
                             <span>Total</span>
-                            <span>${(total / 100).toFixed(2)}</span>
+                            {isLoading ? <Skeleton className="h-5 w-20" /> : <span>${(total / 100).toFixed(2)}</span>}
                         </div>
                     </div>
+
+                    {error && (
+                        <p className="mt-3 text-sm text-destructive">{error}</p>
+                    )}
 
                     <div className="mt-5 space-y-2">
                         <Button className="w-full rounded-full">
@@ -215,17 +159,17 @@ function CartItemRow({
     onUpdateQuantity,
     onEdit,
 }: {
-    item: CartItemType;
+    item: {
+        id: string;
+        product_name: string;
+        quantity: number;
+        options: { option_name: string }[];
+        line_total: number;
+    };
     onRemove: () => void;
     onUpdateQuantity: (qty: number) => void;
     onEdit: () => void;
 }) {
-    const optionsTotal = item.options.reduce(
-        (sum, option) => sum + option.unit_amount * option.quantity,
-        0
-    );
-    const lineTotal = (item.unit_amount + optionsTotal) * item.quantity;
-
     return (
         <Card className="rounded-[1.75rem] border-border/70">
             <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
@@ -236,7 +180,7 @@ function CartItemRow({
                             {item.options.map((option) => option.option_name).join(", ")}
                         </p>
                     )}
-                    <p className="mt-2 text-sm font-semibold">${(lineTotal / 100).toFixed(2)}</p>
+                    <p className="mt-2 text-sm font-semibold">${(item.line_total / 100).toFixed(2)}</p>
                 </div>
                 <div className="flex items-center gap-2 self-end sm:self-auto">
                     <Button

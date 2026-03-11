@@ -1,13 +1,14 @@
 "use client";
 
-import { ProductDialog } from "@/components/store/product-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useMenuScrollSpy } from "@/hooks/use-menu-scroll-spy";
-import { useCartStore } from "@/lib/cart-store";
+import { useCartMutations } from "@/lib/cart-store";
 import { cn } from "@/lib/utils";
+import { useStorefrontProductDialogState } from "@/stores/ui-store";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ProductDialog, type ProductDialogProduct } from "./product-dialog";
 
 type Option = {
     id: string;
@@ -32,7 +33,7 @@ type Product = {
     id: string; store_id: string; category_id: string | null;
     name: string; description: string | null; unit_amount: number;
     image_url: string | null; dietary_tags: string[] | null;
-    allergens: string[] | null; option_lists: OptionList[];
+    allergens: string[] | null;
 };
 type CategorySection = { id: string; name: string; description: string | null; products: Product[] };
 
@@ -137,9 +138,10 @@ function TabBar({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function MenuBrowser({
-    slug, storeName, storeDescription, sections, defaultCategory,
+    storeId, slug, storeName, storeDescription, sections, defaultCategory,
     navbarHeight = 64,
 }: {
+    storeId: string;
     slug: string; storeName: string; storeDescription?: string | null;
     sections: CategorySection[]; defaultCategory: string;
     /** Height of the global navbar in px. Used to offset the sticky header. Defaults to 80. */
@@ -153,14 +155,20 @@ export function MenuBrowser({
     const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
     const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const setStoreSlug = useCartStore((s) => s.setStoreSlug);
-    const addItem = useCartStore((s) => s.addItem);
+    const { setStoreSlug, addItem } = useCartMutations();
+    const storefrontProductDialog = useStorefrontProductDialogState();
 
     const totalItems = useMemo(
         () => sections.reduce((sum, s) => sum + s.products.length, 0),
         [sections],
     );
+    const productsById = useMemo(
+        () => new Map(sections.flatMap((section) => section.products.map((product) => [product.id, product]))),
+        [sections]
+    );
+    const selectedProduct = storefrontProductDialog.itemId
+        ? productsById.get(storefrontProductDialog.itemId) ?? null
+        : null;
 
     // The sticky offset is navbarHeight + the reserved compact row slot + the sticky tab bar height + a small gap.
     const getStickyOffset = useCallback(
@@ -179,70 +187,61 @@ export function MenuBrowser({
 
     return (
         <div className="container mx-auto px-4 py-3">
-            {/* Product dialog */}
-            {selectedProduct && (
-                <ProductDialog
-                    product={selectedProduct}
-                    onClose={() => setSelectedProduct(null)}
-                    onAddToCart={(product, selections, qty) => {
-                        const options = product.option_lists.flatMap((list) =>
-                            list.options.flatMap((option) => {
-                                const selectedCount = selections[list.id]?.[option.id] ?? 0;
-                                if (selectedCount <= 0) return [];
+            <ProductDialog
+                open={storefrontProductDialog.isOpen && !!selectedProduct}
+                productId={selectedProduct?.id ?? ""}
+                storeId={storeId}
+                preview={{
+                    name: selectedProduct?.name,
+                    description: selectedProduct?.description,
+                    image_url: selectedProduct?.image_url,
+                }}
+                onClose={storefrontProductDialog.close}
+                onAddToCart={(
+                    product: ProductDialogProduct,
+                    selections: Record<string, Record<string, number>>,
+                    qty: number
+                ) => {
+                    const options = product.option_lists.flatMap((list) =>
+                        list.options.flatMap((option): {
+                            option_id: string;
+                            option_name: string;
+                            quantity: number;
+                            option_list_id: string;
+                        }[] => {
+                            const selectedCount = selections[list.id]?.[option.id] ?? 0;
+                            if (selectedCount <= 0) return [];
 
-                                return Array.from({ length: selectedCount }, () => ({
-                                    option_id: option.id,
-                                    option_name: option.name,
-                                    unit_amount: Number(option.unit_amount),
-                                    quantity: 1,
-                                    option_list_id: list.id,
-                                }));
-                            })
-                        );
+                            return [{
+                                option_id: option.id,
+                                option_name: option.name,
+                                quantity: selectedCount,
+                                option_list_id: list.id,
+                            }];
+                        })
+                    );
 
-                        // Snapshot option lists so items remain editable later
-                        const product_option_lists = product.option_lists.map((list) => ({
-                            id: list.id,
-                            name: list.name,
-                            selection_node: list.selection_node,
-                            min_num_options: list.min_num_options,
-                            max_num_options: list.max_num_options,
-                            min_aggregate_options_quantity: list.min_aggregate_options_quantity,
-                            max_aggregate_options_quantity: list.max_aggregate_options_quantity,
-                            is_optional: list.is_optional,
-                            options: list.options.map((option) => ({
-                                id: option.id,
-                                name: option.name,
-                                unit_amount: Number(option.unit_amount),
-                                min_option_choice_quantity: option.min_option_choice_quantity,
-                                max_option_choice_quantity: option.max_option_choice_quantity,
-                                default_quantity: option.default_quantity,
-                            })),
-                        }));
+                    toast.success(`Added ${qty} ${product.name} to cart`, {
+                        action: {
+                            label: "View cart",
+                            onClick: () => {
+                                const cartUrl = `/store/${slug}/cart`;
+                                window.location.href = cartUrl;
+                            },
+                        }
+                    });
 
-                        toast.success(`Added ${qty} ${product.name} to cart`, {
-                            action: {
-                                label: "View cart",
-                                onClick: () => {
-                                    const cartUrl = `/store/${slug}/cart`;
-                                    window.location.href = cartUrl;
-                                },
-                            }
-                        });
-
-                        setStoreSlug(slug);
-                        addItem({
-                            product_id: product.id,
-                            product_name: product.name,
-                            unit_amount: Number(product.unit_amount),
-                            quantity: qty,
-                            options,
-                            image_url: product.image_url,
-                            product_option_lists,
-                        });
-                    }}
-                />
-            )}
+                    setStoreSlug(slug);
+                    addItem({
+                        product_id: product.id,
+                        product_name: product.name,
+                        quantity: qty,
+                        options,
+                        image_url: product.image_url,
+                    });
+                    storefrontProductDialog.close();
+                }}
+            />
 
             {/* ── Inline store info (not sticky, scrolls away) ── */}
             <div ref={storeInfoRef} className="flex flex-wrap items-start border border-border/70 justify-between gap-4 p-6 bg-card rounded-2xl mb-6">
@@ -294,7 +293,7 @@ export function MenuBrowser({
                                     <ProductCard
                                         key={product.id}
                                         product={product}
-                                        onSelect={() => setSelectedProduct(product)}
+                                        onSelect={() => storefrontProductDialog.open(product.id)}
                                     />
                                 ))}
                             </div>
@@ -310,9 +309,19 @@ export function MenuBrowser({
 
 // ─── Product card ─────────────────────────────────────────────────────────────
 
-function ProductCard({ product, onSelect }: { product: Product; onSelect: () => void }) {
+function ProductCard({
+    product,
+    onSelect,
+}: {
+    product: Product;
+    onSelect: () => void;
+}) {
     return (
-        <button type="button" onClick={onSelect} className="group w-full text-left">
+        <button
+            type="button"
+            onClick={onSelect}
+            className="group w-full text-left"
+        >
             <div className="flex h-full items-stretch justify-between gap-3 rounded-xl border bg-card p-4 transition-shadow hover:shadow-md">
                 <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
                     <div>

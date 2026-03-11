@@ -8,7 +8,7 @@ import { uploadFileWithSignedUrl } from "@/lib/uploads";
 import {
     emptyCategoryFormData,
     emptyProductFormData,
-    useUIStore,
+    useStockManagementDialogState,
 } from "@/stores/ui-store";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
@@ -35,7 +35,7 @@ export function StockManagementDialogHost() {
         closeProductDialog,
         setCategoryFormData,
         setProductFormData,
-    } = useUIStore();
+    } = useStockManagementDialogState();
 
     const { data: categories = [] } = useQuery({
         queryKey: ["dialog-categories", storeId],

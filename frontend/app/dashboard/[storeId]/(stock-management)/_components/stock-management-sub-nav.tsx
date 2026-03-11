@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button";
-import { useUIStore } from "@/stores/ui-store";
+import { useCategoryDialogActions, useProductDialogActions } from "@/stores/ui-store";
 import { Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,7 +9,8 @@ import { usePathname } from "next/navigation";
 export default function StockManagementSubNav() {
     const pathname = usePathname();
     const directory = pathname.split("/")[3];
-    const { openCategoryCreate, openProductCreate } = useUIStore();
+    const { openCategoryCreate } = useCategoryDialogActions();
+    const { openProductCreate } = useProductDialogActions();
 
     return (
         <div className="border-b rounded-t-md bg-background-elevated/70 backdrop-blur">

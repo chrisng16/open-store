@@ -138,3 +138,24 @@ class ProductResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ProductListItemResponse(BaseModel):
+    id: uuid.UUID
+    store_id: uuid.UUID
+    category_id: uuid.UUID | None
+    name: str
+    description: str | None
+    unit_amount: int
+    currency: str
+    decimal_places: int
+    image_url: str | None
+    is_active: bool
+    sort_order: int
+    dietary_tags: list[str] | None
+    allergens: list[str] | None
+    ingredients: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

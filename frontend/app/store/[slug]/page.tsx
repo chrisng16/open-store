@@ -2,27 +2,6 @@ import { MenuBrowser } from "@/components/store/menu-browser";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
-type Option = {
-    id: string;
-    name: string;
-    unit_amount: number;
-    min_option_choice_quantity: number;
-    max_option_choice_quantity: number;
-    default_quantity: number;
-};
-
-type OptionList = {
-    id: string;
-    name: string;
-    selection_node: "single_select" | "multi_select" | "aggregate_quantity";
-    min_num_options: number;
-    max_num_options: number;
-    min_aggregate_options_quantity: number;
-    max_aggregate_options_quantity: number;
-    is_optional: boolean;
-    options: Option[];
-};
-
 type Product = {
     id: string;
     store_id: string;
@@ -33,7 +12,6 @@ type Product = {
     image_url: string | null;
     dietary_tags: string[] | null;
     allergens: string[] | null;
-    option_lists: OptionList[];
 };
 
 type Category = {
@@ -129,6 +107,7 @@ export default async function MenuPage({
                 </div>
             ) : (
                 <MenuBrowser
+                    storeId={store.id}
                     slug={slug}
                     storeName={store.name}
                     storeDescription={store.description}

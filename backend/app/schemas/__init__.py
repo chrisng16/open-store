@@ -41,6 +41,7 @@ from app.schemas.team import (
     TeamMemberRoleBulkApplyRequest,
     TeamMemberRoleBulkApplyResponse,
 )
+from app.schemas.payment import CreatePaymentIntentRequest
 
 __all__ = [
     "StoreCreate",
@@ -76,4 +77,5 @@ __all__ = [
     "TeamMemberRoleUpdate",
     "TeamMemberRoleBulkApplyRequest",
     "TeamMemberRoleBulkApplyResponse",
+    "CreatePaymentIntentRequest",
 ]
