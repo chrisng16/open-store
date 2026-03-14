@@ -41,7 +41,7 @@ export function StockManagementDialogHost() {
         queryKey: ["dialog-categories", storeId],
         queryFn: async () =>
             fetchWithAccessToken<CategoryResponse[]>(`/stores/${storeId}/categories`),
-        enabled: !!storeId && isProductDialogOpen,
+        enabled: !!storeId,
     });
 
     const categoryOptions: ProductCategoryOption[] = categories.map((category) => ({
@@ -85,19 +85,19 @@ export function StockManagementDialogHost() {
     });
 
     const saveProductMutation = useMutation({
-        mutationFn: async () => {
+        mutationFn: async (formData: typeof productFormData) => {
             if (!storeId) throw new Error("Missing store ID");
-            const endpoint = productFormData.id
-                ? `/stores/${storeId}/products/${productFormData.id}`
+            const endpoint = formData.id
+                ? `/stores/${storeId}/products/${formData.id}`
                 : `/stores/${storeId}/products`;
 
-            const parsedPrice = Number(productFormData.basePrice);
+            const parsedPrice = Number(formData.basePrice);
             if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
                 throw new Error("Price must be a valid positive number");
             }
 
-            const normalizedCategoryName = productFormData.categoryName.trim();
-            let resolvedCategoryId: string | null = productFormData.categoryId || null;
+            const normalizedCategoryName = formData.categoryName.trim();
+            let resolvedCategoryId: string | null = formData.categoryId || null;
 
             if (normalizedCategoryName) {
                 const existingCategory = categories.find(
@@ -136,20 +136,20 @@ export function StockManagementDialogHost() {
             }
 
             await fetchWithAccessToken(endpoint, {
-                method: productFormData.id ? "PATCH" : "POST",
+                method: formData.id ? "PATCH" : "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(
                     denormalizeRequest({
-                        name: productFormData.name,
-                        description: productFormData.description || null,
+                        name: formData.name,
+                        description: formData.description || null,
                         unitAmount: Math.round(parsedPrice * 100),
                         currency: "USD",
                         decimalPlaces: 2,
-                        imageUrl: productFormData.imageUrl || null,
+                        imageUrl: formData.imageUrl || null,
                         categoryId: resolvedCategoryId,
-                        optionLists: productFormData.optionLists.map((optionList, optionListIndex) => ({
+                        optionLists: formData.optionLists.map((optionList, optionListIndex) => ({
                             name: optionList.name.trim(),
                             selectionNode: optionList.maxNumOptions === 1 ? "single_select" : "multi_select",
                             minNumOptions: optionList.minNumOptions,
@@ -175,7 +175,7 @@ export function StockManagementDialogHost() {
             });
         },
         onSuccess: () => {
-            toast.success(productFormData.id ? "Product updated" : "Product created");
+            toast.success("Product saved");
             closeProductDialog();
             setProductFormData(emptyProductFormData);
             if (storeId) {
@@ -192,11 +192,7 @@ export function StockManagementDialogHost() {
             if (!storeId) throw new Error("Missing store ID");
             return uploadFileWithSignedUrl(storeId, file, "productImage");
         },
-        onSuccess: (upload) => {
-            setProductFormData({
-                ...productFormData,
-                imageUrl: upload.fileUrl,
-            });
+        onSuccess: () => {
             toast.success("Image uploaded");
         },
         onError: (error) => {
@@ -213,14 +209,13 @@ export function StockManagementDialogHost() {
         await saveCategoryMutation.mutateAsync();
     }
 
-    async function handleProductSubmit(e: FormEvent) {
-        e.preventDefault();
-        if (!productFormData.name.trim()) {
+    async function handleProductSubmit(formData: typeof productFormData) {
+        if (!formData.name.trim()) {
             toast.error("Product name is required");
             return;
         }
 
-        for (const optionList of productFormData.optionLists) {
+        for (const optionList of formData.optionLists) {
             if (!optionList.name.trim()) {
                 toast.error("Each option list must have a name");
                 return;
@@ -246,7 +241,7 @@ export function StockManagementDialogHost() {
             }
         }
 
-        await saveProductMutation.mutateAsync();
+        await saveProductMutation.mutateAsync(formData);
     }
 
     return (
@@ -263,18 +258,19 @@ export function StockManagementDialogHost() {
             />
 
             <ProductEditorDialog
+                storeId={storeId}
                 open={isProductDialogOpen}
                 onOpenChange={(open: boolean) => {
                     if (!open) closeProductDialog();
                 }}
-                formData={productFormData}
-                onFormDataChange={setProductFormData}
+                initialFormData={productFormData}
                 categories={categoryOptions}
                 isSaving={saveProductMutation.isPending}
                 isUploadingImage={uploadProductImageMutation.isPending}
                 onSubmit={handleProductSubmit}
                 onUploadImage={async (file) => {
-                    await uploadProductImageMutation.mutateAsync(file);
+                    const upload = await uploadProductImageMutation.mutateAsync(file);
+                    return upload.fileUrl;
                 }}
             />
         </>

@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { useProductDialogActions } from "@/stores/ui-store";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { use, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -23,8 +23,6 @@ type Category = {
     sortOrder: number;
 };
 
-type ProductDetail = ProductRow;
-
 export default function MenuEditorPage({
     params,
 }: {
@@ -34,6 +32,7 @@ export default function MenuEditorPage({
     const [productToDelete, setProductToDelete] = useState<ProductRow | null>(null);
     const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
     const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+    const queryClient = useQueryClient();
     const { openProductEdit } = useProductDialogActions();
 
     const { data, isPending, refetch } = useQuery({
@@ -93,58 +92,50 @@ export default function MenuEditorPage({
         },
     });
 
+    function toProductFormData(product: ProductRow, selectedCategoryName: string) {
+        return {
+            id: product.id,
+            name: product.name,
+            description: product.description ?? "",
+            basePrice: String((product.unitAmount ?? 0) / 100),
+            imageUrl: product.imageUrl ?? "",
+            categoryId: product.categoryId ?? "",
+            categoryName: selectedCategoryName,
+            optionLists: (product.optionLists ?? []).map((group) => ({
+                name: group.name,
+                minNumOptions: group.minNumOptions,
+                maxNumOptions: group.maxNumOptions,
+                isOptional: group.isOptional,
+                options: group.options.map((option) => ({
+                    name: option.name,
+                    unitAmount: String((option.unitAmount ?? 0) / 100),
+                    isDefault: option.isDefault,
+                    sortOrder: option.sortOrder,
+                })),
+            })),
+        };
+    }
+
     const columns = useMemo(
         () =>
             getProductsTableColumns({
                 categories: categoryOptions,
                 onEdit: (product) => {
-                    void (async () => {
-                        let editableProduct: ProductRow = product;
-                        try {
-                            const fetched = await fetchWithAccessToken<ProductDetail>(
-                                `/stores/${storeId}/products/${product.id}`
-                            );
-                            editableProduct = fetched;
-                        } catch (error) {
-                            toast.error(
-                                error instanceof Error
-                                    ? error.message
-                                    : "Failed to load product details"
-                            );
-                            return;
-                        }
+                    const initialCategoryName =
+                        categoryOptions.find((category) => category.id === product.categoryId)?.name ?? "";
 
-                        const selectedCategoryName =
-                            categoryOptions.find((category) => category.id === editableProduct.categoryId)?.name ?? "";
+                    queryClient.setQueryData(
+                        ["dialog-product-detail", storeId, product.id],
+                        product
+                    );
 
-                        openProductEdit({
-                            id: editableProduct.id,
-                            name: editableProduct.name,
-                            description: editableProduct.description ?? "",
-                            basePrice: String((editableProduct.unitAmount ?? 0) / 100),
-                            imageUrl: editableProduct.imageUrl ?? "",
-                            categoryId: editableProduct.categoryId ?? "",
-                            categoryName: selectedCategoryName,
-                            optionLists: (editableProduct.optionLists ?? []).map((group) => ({
-                                name: group.name,
-                                minNumOptions: group.minNumOptions,
-                                maxNumOptions: group.maxNumOptions,
-                                isOptional: group.isOptional,
-                                options: group.options.map((option) => ({
-                                    name: option.name,
-                                    unitAmount: String((option.unitAmount ?? 0) / 100),
-                                    isDefault: option.isDefault,
-                                    sortOrder: option.sortOrder,
-                                })),
-                            })),
-                        });
-                    })();
+                    openProductEdit(toProductFormData(product, initialCategoryName));
                 },
                 onDelete: (product) => {
                     setProductToDelete(product);
                 },
             }),
-        [categoryOptions, openProductEdit]
+        [categoryOptions, openProductEdit, queryClient, storeId]
     );
 
     async function handleDeleteProduct() {
@@ -153,34 +144,36 @@ export default function MenuEditorPage({
     }
 
     return (
-        <div className="px-6 h-full">
-            <DataTable
-                columns={columns}
-                data={products}
-                isLoading={isPending}
-                enableRowSelection
-                getRowId={(row) => row.id}
-                renderBulkActions={({ selectedRows }) => (
-                    <Button
-                        variant={selectedRows.length > 0 ? "destructive" : "outline"}
-                        size="sm"
-                        disabled={bulkDeleteProductsMutation.isPending || selectedRows.length === 0}
-                        onClick={() => {
-                            if (!selectedRows.length) return;
-                            setBulkDeleteIds(selectedRows.map((row) => row.id));
-                            setIsBulkDeleteOpen(true);
-                        }}
-                    >
-                        <Trash2 />
-                        {selectedRows.length > 0 ? ` Delete ${selectedRows.length} item${selectedRows.length === 1 ? "" : "s"}` : "Delete"}
-                    </Button>
-                )}
-                loadingText="Loading products..."
-                searchColumnId="name"
-                searchPlaceholder="Search products by name..."
-                emptyTitle="No products yet"
-                emptyDescription="Add items manually or use AI Import."
-            />
+        <div className="flex h-full min-h-0 flex-col overflow-hidden px-6">
+            <div className="min-h-0 flex-1 overflow-hidden">
+                <DataTable
+                    columns={columns}
+                    data={products}
+                    isLoading={isPending}
+                    enableRowSelection
+                    getRowId={(row) => row.id}
+                    renderBulkActions={({ selectedRows }) => (
+                        <Button
+                            variant={selectedRows.length > 0 ? "destructive" : "outline"}
+                            size="sm"
+                            disabled={bulkDeleteProductsMutation.isPending || selectedRows.length === 0}
+                            onClick={() => {
+                                if (!selectedRows.length) return;
+                                setBulkDeleteIds(selectedRows.map((row) => row.id));
+                                setIsBulkDeleteOpen(true);
+                            }}
+                        >
+                            <Trash2 />
+                            {selectedRows.length > 0 ? ` Delete ${selectedRows.length} item${selectedRows.length === 1 ? "" : "s"}` : "Delete"}
+                        </Button>
+                    )}
+                    loadingText="Loading products..."
+                    searchColumnId="name"
+                    searchPlaceholder="Search products by name..."
+                    emptyTitle="No products yet"
+                    emptyDescription="Add items manually or use AI Import."
+                />
+            </div>
 
             <ProductDeleteDialog
                 open={!!productToDelete}

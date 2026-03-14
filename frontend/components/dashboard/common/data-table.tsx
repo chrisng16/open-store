@@ -183,8 +183,8 @@ export function DataTable<TData, TValue>({
     }, [onSelectionChange, rowSelection, selectedCount, selectedRows, table]);
 
     return (
-        <div className="pt-3 h-full min-w-0 w-full flex flex-col">
-            {enableDefaultActionBar && <div className="sticky mb-3 top-0 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="pt-3 h-full min-h-0 min-w-0 w-full overflow-hidden flex flex-col">
+            {enableDefaultActionBar && <div className="shrink-0 mb-3 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 {searchableColumn ? (
                     <Input
                         placeholder={searchPlaceholder}
@@ -224,9 +224,9 @@ export function DataTable<TData, TValue>({
                     </DropdownMenu>
                 </div>
             </div>}
-            {actionBar && <div className="sticky mb-3 top-0 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">{actionBar}</div>}
+            {actionBar && <div className="shrink-0 mb-3 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">{actionBar}</div>}
             {/* Table */}
-            <div className={`${table.getState().pagination.pageSize > 10 ? "overflow-y-auto" : "overflow-y-hidden"} overscroll-none overflow-x-auto rounded-md border bg-background-elevated flex-1 min-w-0 w-full`}>
+            <div className="overflow-y-auto overscroll-none overflow-x-auto rounded-md border bg-background-elevated flex-1 min-h-0 min-w-0 w-full">
                 <Table>
                     <TableHeader className="sticky top-0 bg-background-elevated-2 z-10 shadow dark:shadow-lg">
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -287,7 +287,7 @@ export function DataTable<TData, TValue>({
                 </Table>
             </div>
 
-            <div className={`sticky bottom-0 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between ${size === "sm" ? "text-xs" : size === "md" ? "text-sm" : "text-lg"}`}>
+            <div className={`shrink-0 bg-background-elevated flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between ${size === "sm" ? "text-xs" : size === "md" ? "text-sm" : "text-lg"}`}>
 
                 <div className="text-muted-foreground">
                     {table.getSelectedRowModel().rows.length} of {table.getFilteredRowModel().rows.length} item(s) selected

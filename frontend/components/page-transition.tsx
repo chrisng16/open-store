@@ -25,7 +25,7 @@ export default function PageTransition({
     }, [pathname]);
 
     return (
-        <div ref={ref} className="flex flex-col flex-1">
+        <div ref={ref} className="flex flex-col flex-1 min-h-0">
             {children}
         </div>
     );

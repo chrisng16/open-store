@@ -10,10 +10,10 @@ export default function StoreManagementLayout({
 }) {
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <div className="sticky top-0 z-20 shrink-0">
+            <div className="sticky top-0 z-20 shrink-0 bg-background-elevated">
                 <StockManagementSubNav />
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-hidden">
                 {children}
             </div>
             <StockManagementDialogHost />

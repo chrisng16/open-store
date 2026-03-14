@@ -115,40 +115,42 @@ export default function CategoriesPage({
     }
 
     return (
-        <div className="h-full w-full px-6">
-            <DataTable
-                columns={columns}
-                data={categories}
-                isLoading={isPending}
-                enableRowSelection
-                getRowId={(row) => row.id}
-                renderBulkActions={({ selectedRows }) => (
-                    <Button
-                        variant={selectedRows.length > 0 ? "destructive" : "outline"}
-                        size="sm"
-                        disabled={bulkDeleteMutation.isPending || selectedRows.length === 0}
-                        onClick={() => {
-                            if (!selectedRows.length) return;
-                            setBulkDeleteIds(selectedRows.map((row) => row.id));
-                            setIsBulkDeleteOpen(true);
-                        }}
-                    >
-                        <Trash2 />
-                        {selectedRows.length > 0 ? ` Delete ${selectedRows.length} item${selectedRows.length === 1 ? "" : "s"}` : "Delete"}
-                    </Button>
-                )}
-                loadingText="Loading categories..."
-                searchColumnId="name"
-                searchPlaceholder="Search categories by name..."
-                emptyTitle="No categories yet"
-                emptyDescription="Create your first category to organize products."
-                emptyAction={
-                    <Button variant="outline" onClick={openCreateDialog}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Category
-                    </Button>
-                }
-            />
+        <div className="flex h-full min-h-0 w-full flex-col overflow-hidden px-6">
+            <div className="min-h-0 flex-1 overflow-hidden">
+                <DataTable
+                    columns={columns}
+                    data={categories}
+                    isLoading={isPending}
+                    enableRowSelection
+                    getRowId={(row) => row.id}
+                    renderBulkActions={({ selectedRows }) => (
+                        <Button
+                            variant={selectedRows.length > 0 ? "destructive" : "outline"}
+                            size="sm"
+                            disabled={bulkDeleteMutation.isPending || selectedRows.length === 0}
+                            onClick={() => {
+                                if (!selectedRows.length) return;
+                                setBulkDeleteIds(selectedRows.map((row) => row.id));
+                                setIsBulkDeleteOpen(true);
+                            }}
+                        >
+                            <Trash2 />
+                            {selectedRows.length > 0 ? ` Delete ${selectedRows.length} item${selectedRows.length === 1 ? "" : "s"}` : "Delete"}
+                        </Button>
+                    )}
+                    loadingText="Loading categories..."
+                    searchColumnId="name"
+                    searchPlaceholder="Search categories by name..."
+                    emptyTitle="No categories yet"
+                    emptyDescription="Create your first category to organize products."
+                    emptyAction={
+                        <Button variant="outline" onClick={openCreateDialog}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Category
+                        </Button>
+                    }
+                />
+            </div>
 
             <CategoryDeleteDialog
                 open={isDeleteOpen}

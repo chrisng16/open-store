@@ -104,14 +104,15 @@ export default function AIImportPage({
     };
 
     return (
-
-        <>
-            <ImportSubNav
-                storeId={storeId}
-                uploadMutation={uploadMutation}
-                handleUpload={handleUpload}
-            />
-            <div className="p-6">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <div className="shrink-0">
+                <ImportSubNav
+                    storeId={storeId}
+                    uploadMutation={uploadMutation}
+                    handleUpload={handleUpload}
+                />
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-6">
                 {/* Drag-drop zone */}
                 <Card
                     className="mb-6 border-dashed shadow-none"
@@ -198,6 +199,6 @@ export default function AIImportPage({
                     </div>
                 )}
             </div>
-        </>
+        </div>
     );
 }

@@ -7,7 +7,7 @@ import { FileUp, Loader2 } from "lucide-react";
 export default function ImportSubNav({ storeId, uploadMutation, handleUpload }: { storeId: string; uploadMutation: UseMutationResult<void, unknown, File, unknown>; handleUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>; }) {
 
     return (
-        <div className="sticky top-0 z-10 border-b rounded-t-md bg-background-elevated/70 backdrop-blur">
+        <div className="border-b rounded-t-md bg-background-elevated/70 backdrop-blur">
             <div className="flex items-center justify-between px-6 py-3">
                 <div>
                     <h1 className="font-semibold text-xl">AI Menu Import</h1>

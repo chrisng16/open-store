@@ -29,6 +29,8 @@ export function ProductBasicInfoSheet({
     onUploadImage,
     isUploadingImage,
 }: ProductBasicInfoSheetProps) {
+    const optionGroupCount = formData.optionLists.length;
+
     return (
         <section className="flex min-h-0 w-full xl:w-1/2 max-w-136 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
@@ -149,6 +151,9 @@ export function ProductBasicInfoSheet({
                                     >
                                         {optionsOpen ? <PanelRightOpen className="size-4" /> : <ListPlus className="size-4" />}
                                         {optionsOpen ? "Hide Options" : "Edit Options"}
+                                        <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full border px-1.5 text-[10px] leading-4">
+                                            {optionGroupCount}
+                                        </span>
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
