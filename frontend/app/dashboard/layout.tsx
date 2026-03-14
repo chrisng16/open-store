@@ -13,31 +13,27 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const pathname = usePathname();
-    if (pathname === "/dashboard/store/new") {
-        return (
-            <div className="[--header-height:calc(--spacing(14))] max-h-screen overflow-hidden overscroll-none">
-                <SidebarProvider className="flex flex-col">
-                    <SiteHeader />
-                    <div className="flex min-w-0">
-                        <CreateStoreSidebar collapsible="icon" />
-                        <SidebarInset className="bg-background-elevated min-w-0">
-                            <div className="h-[calc(100dvh-var(--header-height))] overflow-y-auto overscroll-none flex flex-col">
-                                <PageTransition>{children}</PageTransition>
-                            </div>
-                        </SidebarInset>
-                    </div>
-                </SidebarProvider>
-            </div>
-        )
-    }
+    const isCreateStorePage = pathname === "/dashboard/store/new";
+
     return (
         <div className="[--header-height:calc(--spacing(14))] max-h-screen overflow-hidden overscroll-none">
             <SidebarProvider className="flex flex-col">
                 <SiteHeader />
                 <div className="flex min-w-0">
-                    <AppSidebar collapsible="icon" />
+                    {isCreateStorePage ? (
+                        <CreateStoreSidebar collapsible="icon" />
+                    ) : (
+                        <AppSidebar collapsible="icon" />
+                    )}
+
                     <SidebarInset className="bg-background-elevated min-w-0">
-                        <div className="h-[calc(100dvh-var(--header-height)-0.5rem)] overflow-y-auto overflow-x-hidden overscroll-none flex flex-col">
+                        <div
+                            className={
+                                isCreateStorePage
+                                    ? "h-[calc(100dvh-var(--header-height))] overflow-y-auto overscroll-none flex flex-col"
+                                    : "h-[calc(100dvh-var(--header-height)-0.5rem)] overflow-y-auto overflow-x-hidden overscroll-none flex flex-col"
+                            }
+                        >
                             <PageTransition>{children}</PageTransition>
                         </div>
                     </SidebarInset>

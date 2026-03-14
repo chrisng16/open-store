@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import StoreCardDisplay from "./_components/store-card-display";
 
 export default function Page() {
+
   return (
     <Dialog defaultOpen={true}>
       <DialogContent

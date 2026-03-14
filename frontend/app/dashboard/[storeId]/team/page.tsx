@@ -406,7 +406,7 @@ export default function TeamPage({
 
                 {activeTab !== "invites" ? (
                     <div className="sticky inset-x-0 bottom-0 z-40 rounded-b-md border-t bg-background-elevated/70 backdrop-blur">
-                        <div className="mx-auto flex w-full max-w-4xl items-center justify-end gap-2 p-4 py-3">
+                        <div className="mx-auto flex w-full items-center justify-end gap-2 p-4 py-3">
                             <Button
                                 type="button"
                                 variant="outline"

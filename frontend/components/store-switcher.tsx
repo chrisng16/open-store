@@ -77,21 +77,14 @@ export function StoreSwitcher() {
     return (
         routeStoreId && <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <div className="flex items-center gap-2">
-                    <div className="grid flex-1 text-left">
-                        <span className="text-sm font-semibold text-muted-foreground">{activeStore.name}</span>
-                    </div>
-                    <Button variant={'ghost'} size={'icon-sm'}>
-                        {/* <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg text-xs font-semibold">
-                        {activeStore.name.slice(0, 1).toUpperCase()}
-                    </div> */}
-                        <ChevronsUpDown className="text-muted-foreground" />
-                    </Button>
-                </div>
+                <Button variant={'ghost'} size={'sm'}>
+                    <span className="text-base font-semibold">{activeStore.name}</span>
+                    <ChevronsUpDown className="text-muted-foreground" />
+                </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-                align="end"
+                align="start"
                 side={"bottom"}
                 sideOffset={4}
             >

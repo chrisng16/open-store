@@ -226,9 +226,9 @@ export function DataTable<TData, TValue>({
             </div>}
             {actionBar && <div className="shrink-0 mb-3 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">{actionBar}</div>}
             {/* Table */}
-            <div className="overflow-y-auto overscroll-none overflow-x-auto rounded-md border bg-background-elevated flex-1 min-h-0 min-w-0 w-full">
+            <div className="overflow-y-auto overscroll-none overflow-x-auto rounded-md shadow-xs border bg-background-elevated flex-1 min-h-0 min-w-0 w-full">
                 <Table>
-                    <TableHeader className="sticky top-0 bg-background-elevated-2 z-10 shadow dark:shadow-lg">
+                    <TableHeader className="sticky top-0 bg-background-elevated-2 z-10 shadow-2xs">
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => (

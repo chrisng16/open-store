@@ -39,7 +39,7 @@ export function NavGroup({
   console.log("Rendering NavGroup with activeRoute:", activeRoute, items);
   return (
     <SidebarGroup className="pt-0">
-      <SidebarGroupLabel>{navGroupTitle}</SidebarGroupLabel>
+      <SidebarGroupLabel className="truncate">{navGroupTitle}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
           <SidebarMenuItem key={item.title}>

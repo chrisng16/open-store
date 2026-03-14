@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export default function LoginPage() {
@@ -14,6 +14,9 @@ export default function LoginPage() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const searchParams = useSearchParams()
+    const redirectTo = searchParams.get("redirect") || "/dashboard";
+
     const router = useRouter();
     const supabase = createClient();
 
@@ -31,7 +34,7 @@ export default function LoginPage() {
             setError(error.message);
             setLoading(false);
         } else {
-            router.push("/dashboard");
+            router.push(redirectTo);
             router.refresh();
         }
     }
@@ -40,7 +43,7 @@ export default function LoginPage() {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/api/auth/callback`,
+                redirectTo: `${window.location.origin}/api/auth/callback?next=${redirectTo}`,
             },
         });
         if (error) setError(error.message);
