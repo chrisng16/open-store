@@ -114,3 +114,24 @@ class StoreMemberResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class OnboardingStepStatus(BaseModel):
+    id: str
+    title: str
+    completed: bool
+    required: bool = True
+    blocking_reasons: list[str] = Field(default_factory=list)
+
+
+class StoreOnboardingStatusResponse(BaseModel):
+    store_id: uuid.UUID
+    onboarding_complete: bool
+    can_go_live: bool
+    is_active: bool
+    completed_required_steps: int
+    total_required_steps: int
+    next_step_id: str | None
+    active_product_count: int
+    has_published_import: bool
+    steps: list[OnboardingStepStatus]

@@ -7,8 +7,18 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.api.deps import get_current_user, get_store_context, require_role, CurrentUser, StoreContext
 from app.models.store import Store, StoreMember, MemberRole
-from app.schemas.store import StoreCreate, StoreUpdate, StoreResponse, StorePublicResponse
+from app.schemas.store import (
+    StoreCreate,
+    StoreUpdate,
+    StoreResponse,
+    StorePublicResponse,
+    StoreOnboardingStatusResponse,
+)
 from app.services.team import build_default_store_roles
+from app.services.onboarding import (
+    get_store_onboarding_status,
+    refresh_store_activation_from_onboarding,
+)
 
 router = APIRouter(prefix="/stores", tags=["stores"])
 
@@ -44,6 +54,7 @@ async def create_store(
         address=data.address,
         phone=data.phone,
         timezone=data.timezone,
+        is_active=False,
     )
     if data.business_hours:
         store.set_business_hours(data.business_hours.model_dump())
@@ -112,3 +123,19 @@ async def update_store(
     await db.flush()
     await db.refresh(store)
     return store
+
+
+@router.get("/{store_id}/onboarding-status", response_model=StoreOnboardingStatusResponse)
+async def get_store_onboarding_status_route(
+    ctx: StoreContext = Depends(require_role(MemberRole.staff)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await get_store_onboarding_status(db=db, store=ctx.store)
+
+
+@router.post("/{store_id}/onboarding-status/refresh", response_model=StoreOnboardingStatusResponse)
+async def refresh_store_onboarding_status_route(
+    ctx: StoreContext = Depends(require_role(MemberRole.owner)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await refresh_store_activation_from_onboarding(db=db, store=ctx.store)

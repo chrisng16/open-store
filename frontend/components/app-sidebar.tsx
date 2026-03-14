@@ -3,17 +3,15 @@
 import {
   Boxes,
   ChartNoAxesCombined,
-  Frame,
+  CreditCard,
   LifeBuoy,
-  Map,
   Package,
-  PieChart,
   Send,
   ShoppingBag,
   SidebarIcon,
   Sparkles,
   Store,
-  Users
+  Users,
 } from "lucide-react"
 import * as React from "react"
 
@@ -23,29 +21,34 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  useSidebar
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { usePathname } from "next/navigation"
 import { Button } from "./ui/button"
 
 const data = {
-  navDashboard: [
+  navStoreSetup: [
     {
-      title: "Analytics",
-      url: "/analytics",
-      icon: ChartNoAxesCombined,
-    },
-    {
-      title: "Orders",
-      url: "/orders",
-      icon: ShoppingBag,
-    },
-  ],
-  navManage: [
-    {
-      title: "Store",
+      title: "General",
       url: "/",
       icon: Store,
+    },
+    {
+      title: "Team",
+      url: "/team",
+      icon: Users,
+    },
+    {
+      title: "Payments",
+      url: "/payments",
+      icon: CreditCard,
+    },
+  ],
+  navCatalog: [
+    {
+      title: "Products",
+      url: "/products",
+      icon: Package,
     },
     {
       title: "Categories",
@@ -53,19 +56,21 @@ const data = {
       icon: Boxes,
     },
     {
-      title: "Products",
-      url: "/products",
-      icon: Package,
-    },
-    {
       title: "AI Import",
       url: "/ai-import",
       icon: Sparkles,
     },
+  ],
+  navOperations: [
     {
-      title: "Team",
-      url: "/team",
-      icon: Users,
+      title: "Orders",
+      url: "/orders",
+      icon: ShoppingBag,
+    },
+    {
+      title: "Analytics",
+      url: "/analytics",
+      icon: ChartNoAxesCombined,
     },
   ],
   navSecondary: [
@@ -80,37 +85,20 @@ const data = {
       icon: Send,
     },
   ],
-  teams: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  ...props
+}: React.ComponentProps<typeof Sidebar>) {
   const { toggleSidebar } = useSidebar()
 
   const pathname = usePathname()
   const activeRoute = React.useMemo(() => {
     if (!pathname) return null
     const parts = pathname.split("/").filter(Boolean)
-    if (parts.length < 3) return 'store'
+    if (parts.length < 3) return 'general'
     return parts[2]
   }, [pathname])
-
-  console.log(activeRoute)
 
   return (
     <Sidebar
@@ -118,12 +106,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       className="pt-0 overflow-auto overscroll-none top-(--header-height) h-[calc(100svh-var(--header-height))]!"
       {...props}
     >
-
       <SidebarContent className="pt-0">
-        <NavGroup items={data.navManage} navGroupTitle="Manage" activeRoute={activeRoute} />
-        <NavGroup items={data.navDashboard} navGroupTitle="Dashboard" activeRoute={activeRoute} />
-        <NavSecondary items={data.navSecondary} activeRoute={activeRoute} className="mt-auto" />
+        <NavGroup
+          items={data.navStoreSetup}
+          navGroupTitle="Store Settings"
+          activeRoute={activeRoute}
+        />
+        <NavGroup
+          items={data.navCatalog}
+          navGroupTitle="Catalog"
+          activeRoute={activeRoute}
+        />
+        <NavGroup
+          items={data.navOperations}
+          navGroupTitle="Operations"
+          activeRoute={activeRoute}
+        />
+        <NavSecondary
+          items={data.navSecondary}
+          activeRoute={activeRoute}
+          className="mt-auto"
+        />
       </SidebarContent>
+
       <SidebarFooter>
         <Button
           className="h-8 w-8"

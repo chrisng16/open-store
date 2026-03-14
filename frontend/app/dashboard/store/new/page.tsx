@@ -2,9 +2,12 @@
 
 import { StoreEditForm, StoreEditFormHandle } from "@/components/dashboard/store/store-edit-form";
 import { Button } from "@/components/ui/button";
+import { Store } from "@/queries/stores";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 export default function NewStorePage() {
+    const router = useRouter();
 
     const formRef = useRef<StoreEditFormHandle>(null);
     const [formState, setFormState] = useState({ isDirty: false, isSubmitting: false });
@@ -17,7 +20,13 @@ export default function NewStorePage() {
                 </div>
             </div>
             <div className="mx-auto max-w-4xl p-6">
-                <StoreEditForm ref={formRef} onStateChange={setFormState} />
+                <StoreEditForm
+                    ref={formRef}
+                    onStateChange={setFormState}
+                    onSuccess={(store: Store) => {
+                        router.push(`/dashboard/${store.id}/onboarding`);
+                    }}
+                />
             </div>
             <div className="sticky rounded-b-md inset-x-0 bottom-0 z-40 border-t bg-background-elevated/70 backdrop-blur">
                 <div className="mx-auto flex w-full max-w-4xl items-center justify-end gap-2 p-4 py-3">

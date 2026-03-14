@@ -5,7 +5,7 @@ import {
   Bell,
   CreditCard,
   LogOut,
-  Sparkles
+  Sparkles,
 } from "lucide-react"
 
 import {
@@ -25,6 +25,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { User } from '@supabase/supabase-js'
 import { useEffect, useState } from "react"
+import { ThemeSwitcherSubmenu } from "./theme-switcher-submenu"
 import { Skeleton } from "./ui/skeleton"
 
 export function NavUser() {
@@ -86,6 +87,7 @@ export function NavUser() {
             <Sparkles />
             Upgrade to Pro
           </DropdownMenuItem>
+          <ThemeSwitcherSubmenu />
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>

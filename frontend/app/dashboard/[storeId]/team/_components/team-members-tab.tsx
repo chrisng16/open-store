@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
     Select,
     SelectContent,
@@ -18,10 +17,7 @@ type TeamMembersTabProps = {
     currentUserId: string | null;
     actorPriority: number;
     drafts: Record<string, string>;
-    isSaving: boolean;
     onRoleDraftChange: (memberId: string, roleId: string) => void;
-    onSave: () => void;
-    onDiscard: () => void;
 };
 
 function roleBadge(name: string) {
@@ -37,10 +33,7 @@ export function TeamMembersTab({
     currentUserId,
     actorPriority,
     drafts,
-    isSaving,
     onRoleDraftChange,
-    onSave,
-    onDiscard,
 }: TeamMembersTabProps) {
     const isDirty = Object.keys(drafts).length > 0;
 
@@ -99,14 +92,7 @@ export function TeamMembersTab({
                 </Table>
             </div>
 
-            <div className="sticky bottom-0 z-20 flex justify-end gap-2 rounded-md border bg-background/95 p-3 backdrop-blur">
-                <Button variant="outline" onClick={onDiscard} disabled={!isDirty || isSaving}>
-                    Discard
-                </Button>
-                <Button onClick={onSave} disabled={!isDirty || isSaving}>
-                    {isSaving ? "Saving..." : "Save changes"}
-                </Button>
-            </div>
+
         </div>
     );
 }

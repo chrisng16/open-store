@@ -35,6 +35,8 @@ export function NavGroup({
     if (!storeId) return suffix || "#"; // fallback (or return "#" / disable)
     return `/dashboard/${storeId}${suffix}`;
   };
+
+  console.log("Rendering NavGroup with activeRoute:", activeRoute, items);
   return (
     <SidebarGroup className="pt-0">
       <SidebarGroupLabel>{navGroupTitle}</SidebarGroupLabel>

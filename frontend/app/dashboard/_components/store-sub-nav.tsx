@@ -4,35 +4,40 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { useTeamMembersQuery } from "@/queries/team";
+import { useQuery } from "@tanstack/react-query";
 import { CreditCard, ExternalLink, FileUp, Package, ShoppingBag } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 interface StoreSubNavProps {
     storeId: string;
-    storeName: string;
-    storeSlug: string;
+    storeName: string | undefined;
+    storeSlug: string | undefined;
     pending: boolean;
 }
 
 export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: StoreSubNavProps) {
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const membersQuery = useTeamMembersQuery(storeId);
+    const currentUserIdQuery = useQuery({
+        queryKey: ["current-user-id"],
+        queryFn: async () => {
+            const supabase = createClient();
+            const { data } = await supabase.auth.getUser();
+            return data.user?.id ?? null;
+        },
+        staleTime: 5 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+    });
 
-    useEffect(() => {
-        const supabase = createClient();
-        void supabase.auth.getUser().then(({ data }) => {
-            setCurrentUserId(data.user?.id ?? null);
-        });
-    }, []);
+    console.log("store-sub-nav")
 
     const isOwner = useMemo(() => {
-        if (!currentUserId || !membersQuery.data) {
+        if (!currentUserIdQuery.data || !membersQuery.data) {
             return false;
         }
-        const myMember = membersQuery.data.find((member) => member.userId === currentUserId);
+        const myMember = membersQuery.data.find((member) => member.userId === currentUserIdQuery.data);
         return myMember?.role === "owner";
-    }, [currentUserId, membersQuery.data]);
+    }, [currentUserIdQuery.data, membersQuery.data]);
 
     const navItems = [
         { href: `/dashboard/${storeId}/orders`, label: "Orders", icon: ShoppingBag },
@@ -43,11 +48,11 @@ export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: 
             : []),
     ];
     return (
-        < div className="border-b rounded-t-md bg-background-elevated/70 backdrop-blur sticky top-0 z-10" >
+        <div className="border-b rounded-t-md bg-background-elevated/70 backdrop-blur sticky top-0 z-10">
             <div className="flex items-center justify-between px-6 py-3">
                 <div className="flex flex-col">
                     {
-                        pending ? <Skeleton className="h-6 w-32" /> : <h2 className="font-semibold text-xl">{storeName || "Store"}</h2>
+                        pending ? <Skeleton className="h-7 w-32" /> : <h2 className="font-semibold text-xl">{storeName || "Store"}</h2>
                     }
                     <Link
                         href={`/store/${storeSlug}/`}
@@ -73,6 +78,6 @@ export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: 
                     })}
                 </div>
             </div>
-        </div >
+        </div>
     )
 }

@@ -2,6 +2,7 @@
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CreateStoreSidebar } from "@/components/create-store-sidebar";
+import PageTransition from "@/components/page-transition";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
@@ -20,8 +21,8 @@ export default function DashboardLayout({
                     <div className="flex min-w-0">
                         <CreateStoreSidebar collapsible="icon" />
                         <SidebarInset className="bg-background-elevated min-w-0">
-                            <div className="h-[calc(100dvh-var(--header-height))] overflow-y-auto overscroll-none">
-                                {children}
+                            <div className="h-[calc(100dvh-var(--header-height))] overflow-y-auto overscroll-none flex flex-col">
+                                <PageTransition>{children}</PageTransition>
                             </div>
                         </SidebarInset>
                     </div>
@@ -36,8 +37,8 @@ export default function DashboardLayout({
                 <div className="flex min-w-0">
                     <AppSidebar collapsible="icon" />
                     <SidebarInset className="bg-background-elevated min-w-0">
-                        <div className="h-[calc(100dvh-var(--header-height)-0.5rem)] overflow-y-auto overflow-x-hidden overscroll-none">
-                            {children}
+                        <div className="h-[calc(100dvh-var(--header-height)-0.5rem)] overflow-y-auto overflow-x-hidden overscroll-none flex flex-col">
+                            <PageTransition>{children}</PageTransition>
                         </div>
                     </SidebarInset>
                 </div>

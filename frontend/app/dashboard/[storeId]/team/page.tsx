@@ -18,6 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -31,7 +32,7 @@ import {
     useTeamRolesQuery,
 } from "@/queries/team";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, Plus, UserPlus } from "lucide-react";
+import { Plus, UserPlus } from "lucide-react";
 import { use, useEffect, useMemo, useState } from "react";
 
 import { InvitesTab } from "./_components/invites-tab";
@@ -257,126 +258,177 @@ export default function TeamPage({
 
     if (isLoading) {
         return (
-            <>
+            <div className="h-full flex flex-col flex-1">
                 <TeamSubNav />
-                <div className="p-6 text-muted-foreground">
-                    <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                    Loading team...
+                <div className="px-4 md:px-6 flex-1 h-full">
+                    {/* Tabs bar skeleton */}
+                    <div className="sticky top-19 z-20 flex items-center justify-between border-b bg-background-elevated/80 py-2">
+                        <Tabs>
+                            <TabsList variant="line">
+                                <TabsTrigger value="members">Team Members</TabsTrigger>
+                                <TabsTrigger value="roles">Roles</TabsTrigger>
+                                <TabsTrigger value="invites">Invites</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                        <div className="flex gap-2 pr-2">
+                            <Skeleton className="h-8 w-28 bg-accent" />
+                        </div>
+                    </div>
+                    {/* Table skeleton */}
+                    <div className="mt-4 rounded-md border">
+                        <div className="grid grid-cols-4 gap-4 border-b px-4 py-3">
+                            {["w-20", "w-24", "w-24", "w-16"].map((w, i) => (
+                                <Skeleton key={i} className={`h-4 ${w}`} />
+                            ))}
+                        </div>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="grid grid-cols-4 gap-4 border-b px-4 py-4 last:border-0">
+                                <Skeleton className="h-4 w-32" />
+                                <Skeleton className="h-4 w-16" />
+                                <Skeleton className="h-8 w-36" />
+                                <Skeleton className="h-4 w-24" />
+                            </div>
+                        ))}
+                    </div>
                 </div>
-            </>
+                {/* Action bar skeleton */}
+                <div className="sticky inset-x-0 bottom-0 z-40 border-t bg-background-elevated/70 backdrop-blur">
+                    <div className="mx-auto flex w-full max-w-4xl items-center justify-end gap-2 p-4 py-3">
+                        <Skeleton className="h-9 w-32" />
+                        <Skeleton className="h-9 w-28" />
+                    </div>
+                </div>
+            </div>
         );
     }
 
     return (
         <>
-            <TeamSubNav />
+            <div className="h-full flex flex-col flex-1">
+                <TeamSubNav />
+                <Tabs className="px-4 md:px-6 flex-1" value={activeTab} onValueChange={handleTabChange}>
+                    <div className="sticky top-19 z-20 flex items-center justify-between border-b bg-background-elevated/80 py-2">
+                        <TabsList variant="line">
+                            <TabsTrigger value="members">Team Members</TabsTrigger>
+                            <TabsTrigger value="roles">Roles</TabsTrigger>
+                            <TabsTrigger value="invites">Invites</TabsTrigger>
+                        </TabsList>
 
-            <Tabs className="px-4 md:px-6" value={activeTab} onValueChange={handleTabChange}>
-                <div className="sticky top-19 z-20 flex items-center justify-between border-b bg-background-elevated/80 py-2">
-                    <TabsList variant="line">
-                        <TabsTrigger value="members">Team Members</TabsTrigger>
-                        <TabsTrigger value="roles">Roles</TabsTrigger>
-                        <TabsTrigger value="invites">Invites</TabsTrigger>
-                    </TabsList>
-
-                    <div className="flex items-center gap-2 pr-2">
-                        {activeTab === "roles" && canManageRoles ? (
-                            <Button variant="outline" size="sm" onClick={() => setCreateRoleSheetOpen(true)}>
-                                <Plus className="h-4 w-4" />
-                                Add role
-                            </Button>
-                        ) : null}
-                        {canManageInvites ? (
-                            <Button size="sm" onClick={() => setInviteDialogOpen(true)}>
-                                <UserPlus className="h-4 w-4" />
-                                Add member
-                            </Button>
-                        ) : null}
+                        <div className="flex items-center gap-2 pr-2">
+                            {activeTab === "roles" && canManageRoles ? (
+                                <Button variant="outline" size="sm" onClick={() => setCreateRoleSheetOpen(true)}>
+                                    <Plus className="h-4 w-4" />
+                                    Add role
+                                </Button>
+                            ) : null}
+                            {canManageInvites ? (
+                                <Button size="sm" onClick={() => setInviteDialogOpen(true)}>
+                                    <UserPlus className="h-4 w-4" />
+                                    Add member
+                                </Button>
+                            ) : null}
+                        </div>
                     </div>
-                </div>
 
-                <TabsContent value="members" className="mt-4">
-                    <TeamMembersTab
-                        members={membersQuery.data ?? []}
-                        roles={rolesQuery.data ?? []}
-                        currentUserId={currentUserId}
-                        actorPriority={actorPriority}
-                        drafts={memberDrafts}
-                        isSaving={saveMembersMutation.isPending}
-                        onRoleDraftChange={(memberId, roleId) => {
-                            const member = (membersQuery.data ?? []).find((item) => item.id === memberId);
-                            if (!member) {
-                                return;
-                            }
-                            const currentRoleId = roleIdByName[member.roleName];
-                            setMemberDrafts((prev) => {
-                                const next = { ...prev };
-                                if (currentRoleId && roleId === currentRoleId) {
-                                    delete next[memberId];
-                                } else {
-                                    next[memberId] = roleId;
+                    <TabsContent value="members" className="mt-4">
+                        <TeamMembersTab
+                            members={membersQuery.data ?? []}
+                            roles={rolesQuery.data ?? []}
+                            currentUserId={currentUserId}
+                            actorPriority={actorPriority}
+                            drafts={memberDrafts}
+                            onRoleDraftChange={(memberId, roleId) => {
+                                const member = (membersQuery.data ?? []).find((item) => item.id === memberId);
+                                if (!member) {
+                                    return;
                                 }
-                                return next;
-                            });
-                        }}
-                        onDiscard={() => setMemberDrafts({})}
-                        onSave={() => saveMembersMutation.mutate()}
-                    />
-                </TabsContent>
+                                const currentRoleId = roleIdByName[member.roleName];
+                                setMemberDrafts((prev) => {
+                                    const next = { ...prev };
+                                    if (currentRoleId && roleId === currentRoleId) {
+                                        delete next[memberId];
+                                    } else {
+                                        next[memberId] = roleId;
+                                    }
+                                    return next;
+                                });
+                            }}
+                        />
+                    </TabsContent>
 
-                <TabsContent value="roles" className="mt-4">
-                    <RolesTab
-                        roles={rolesQuery.data ?? []}
-                        actorPriority={actorPriority}
-                        drafts={roleDrafts}
-                        isSaving={saveRolesMutation.isPending}
-                        onDraftChange={(roleId, patch) => {
-                            const role = (rolesQuery.data ?? []).find((item) => item.id === roleId);
-                            if (!role) {
-                                return;
-                            }
-                            setRoleDrafts((prev) => {
-                                const nextDraft = {
-                                    description: prev[roleId]?.description ?? role.description ?? "",
-                                    priority: prev[roleId]?.priority ?? role.priority,
-                                    permissions: prev[roleId]?.permissions ?? role.permissions,
-                                    ...patch,
-                                };
-
-                                const unchanged =
-                                    nextDraft.description === (role.description ?? "") &&
-                                    nextDraft.priority === role.priority &&
-                                    nextDraft.permissions.length === role.permissions.length &&
-                                    nextDraft.permissions.every((permission) => role.permissions.includes(permission));
-
-                                const next = { ...prev };
-                                if (unchanged) {
-                                    delete next[roleId];
-                                } else {
-                                    next[roleId] = nextDraft;
+                    <TabsContent value="roles" className="mt-4">
+                        <RolesTab
+                            roles={rolesQuery.data ?? []}
+                            actorPriority={actorPriority}
+                            drafts={roleDrafts}
+                            onDraftChange={(roleId, patch) => {
+                                const role = (rolesQuery.data ?? []).find((item) => item.id === roleId);
+                                if (!role) {
+                                    return;
                                 }
-                                return next;
-                            });
-                        }}
-                        onDiscard={() => {
-                            setRoleDrafts({});
-                            setNewRoleDraft(EMPTY_NEW_ROLE);
-                        }}
-                        onSave={() => saveRolesMutation.mutate()}
-                    />
-                </TabsContent>
+                                setRoleDrafts((prev) => {
+                                    const nextDraft = {
+                                        description: prev[roleId]?.description ?? role.description ?? "",
+                                        priority: prev[roleId]?.priority ?? role.priority,
+                                        permissions: prev[roleId]?.permissions ?? role.permissions,
+                                        ...patch,
+                                    };
 
-                <TabsContent value="invites" className="mt-4">
-                    <InvitesTab
-                        pendingInvites={pendingInvites}
-                        canManageInvites={canManageInvites}
-                        isRevoking={revokeMutation.isPending}
-                        feedback={feedback}
-                        onRevokeInvite={(inviteId) => revokeMutation.mutate(inviteId)}
-                        onFeedback={setFeedback}
-                    />
-                </TabsContent>
-            </Tabs>
+                                    const unchanged =
+                                        nextDraft.description === (role.description ?? "") &&
+                                        nextDraft.priority === role.priority &&
+                                        nextDraft.permissions.length === role.permissions.length &&
+                                        nextDraft.permissions.every((permission) => role.permissions.includes(permission));
+
+                                    const next = { ...prev };
+                                    if (unchanged) {
+                                        delete next[roleId];
+                                    } else {
+                                        next[roleId] = nextDraft;
+                                    }
+                                    return next;
+                                });
+                            }}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="invites" className="mt-4">
+                        <InvitesTab
+                            pendingInvites={pendingInvites}
+                            canManageInvites={canManageInvites}
+                            isRevoking={revokeMutation.isPending}
+                            feedback={feedback}
+                            onRevokeInvite={(inviteId) => revokeMutation.mutate(inviteId)}
+                            onFeedback={setFeedback}
+                        />
+                    </TabsContent>
+                </Tabs>
+
+                {activeTab !== "invites" ? (
+                    <div className="sticky inset-x-0 bottom-0 z-40 rounded-b-md border-t bg-background-elevated/70 backdrop-blur">
+                        <div className="mx-auto flex w-full max-w-4xl items-center justify-end gap-2 p-4 py-3">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={discardCurrentTab}
+                                disabled={!hasUnsavedChanges || saveMembersMutation.isPending || saveRolesMutation.isPending}
+                            >
+                                Discard changes
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={() => {
+                                    if (activeTab === "members") saveMembersMutation.mutate();
+                                    if (activeTab === "roles") saveRolesMutation.mutate();
+                                }}
+                                disabled={!hasUnsavedChanges || saveMembersMutation.isPending || saveRolesMutation.isPending}
+                            >
+                                {saveMembersMutation.isPending || saveRolesMutation.isPending ? "Saving..." : "Save changes"}
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
+            </div>
 
             <UnsavedChangesDialog
                 open={showUnsavedDialog}

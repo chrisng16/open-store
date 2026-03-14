@@ -20,6 +20,7 @@ import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { denormalizeRequest } from "@/lib/normalize-response";
 import { Store } from "@/queries/stores";
 import { useForm } from "@tanstack/react-form";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { forwardRef, useEffect, useImperativeHandle } from "react";
 import { toast } from "sonner";
 
@@ -66,8 +67,56 @@ function FormStateSync({
 export const StoreEditForm = forwardRef<StoreEditFormHandle, StoreEditFormProps>(
     function StoreEditForm({ store, onSuccess, onStateChange }, ref) {
         const isCreate = !store;
+        const queryClient = useQueryClient();
 
-        console.log(store)
+        const saveStoreMutation = useMutation({
+            mutationFn: async (value: {
+                name: string;
+                description: string;
+                address: string;
+                phone: string;
+                slug: string;
+                timezone: string;
+                businessHours: WeekHours;
+            }) => {
+                const base = {
+                    ...value,
+                    description: value.description || null,
+                    address: value.address || null,
+                    phone: value.phone || null,
+                } as Record<string, unknown>;
+
+                if (!isCreate) {
+                    delete base.slug;
+                }
+
+                const payload = denormalizeRequest(base);
+                const endpoint = isCreate ? "/stores" : `/stores/${store!.id}`;
+                const method = isCreate ? "POST" : "PATCH";
+
+                return fetchWithAccessToken<Store>(endpoint, {
+                    method,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+            },
+            onSuccess: async (updated) => {
+                await queryClient.invalidateQueries({ queryKey: ["stores"] });
+                await queryClient.invalidateQueries({ queryKey: ["store", updated.id] });
+                await queryClient.invalidateQueries({
+                    queryKey: ["store", updated.id, "onboarding-status"],
+                });
+
+                form.reset();
+                toast.success(isCreate ? "Store created successfully" : "Store updated successfully");
+                onSuccess?.(updated);
+            },
+            onError: (error) => {
+                toast.error(
+                    error instanceof Error ? error.message : "Failed to save store"
+                );
+            },
+        });
 
         const form = useForm({
             defaultValues: {
@@ -84,40 +133,7 @@ export const StoreEditForm = forwardRef<StoreEditFormHandle, StoreEditFormProps>
             },
 
             onSubmit: async ({ value }) => {
-                try {
-                    // Ensure nullable fields are explicit
-                    const base = {
-                        ...value,
-                        description: value.description || null,
-                        address: value.address || null,
-                        phone: value.phone || null,
-                    } as Record<string, unknown>;
-
-                    // When editing we don't send `slug` (it's immutable on edit)
-                    if (!isCreate) delete base.slug;
-
-                    const payload = denormalizeRequest(base);
-
-                    console.log("Submitting store form with payload:", payload);
-
-                    const endpoint = isCreate ? `/stores` : `/stores/${store!.id}`;
-                    const method = isCreate ? "POST" : "PATCH";
-
-                    const updated = await fetchWithAccessToken<Store>(endpoint, {
-                        method,
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload),
-                    });
-
-                    form.reset()
-
-                    toast.success(isCreate ? "Store created successfully" : "Store updated successfully");
-                    onSuccess?.(updated);
-                } catch (error) {
-                    toast.error(
-                        error instanceof Error ? error.message : "Failed to save store"
-                    );
-                }
+                await saveStoreMutation.mutateAsync(value);
             },
         });
 
@@ -366,7 +382,7 @@ export const StoreEditForm = forwardRef<StoreEditFormHandle, StoreEditFormProps>
                 <form.Subscribe
                     selector={(state) => ({
                         isDirty: state.isDirty,
-                        isSubmitting: state.isSubmitting,
+                        isSubmitting: state.isSubmitting || saveStoreMutation.isPending,
                     })}
                 >
                     {(state) => (

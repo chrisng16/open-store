@@ -65,6 +65,10 @@ export const api = {
             request(`/stores/${storeId}`),
         update: (storeId: string, data: unknown, token: string) =>
             request(`/stores/${storeId}`, { method: "PATCH", body: data, token }),
+        onboardingStatus: (storeId: string, token: string) =>
+            request(`/stores/${storeId}/onboarding-status`, { token }),
+        refreshOnboardingStatus: (storeId: string, token: string) =>
+            request(`/stores/${storeId}/onboarding-status/refresh`, { method: "POST", token }),
         listMine: (token: string) =>
             request(`/stores/mine/members`, { token }),
     },

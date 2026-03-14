@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,9 +13,10 @@ from app.api.deps import (
     CurrentUser,
     StoreContext,
 )
-from app.models.store import MemberRole
+from app.models.store import MemberRole, Store
 from app.models.order import Order, OrderItem, OrderItemOption, OrderStatus
 from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
+from app.services.onboarding import get_store_onboarding_status
 
 router = APIRouter(prefix="/stores/{store_id}", tags=["orders"])
 
@@ -24,9 +25,21 @@ router = APIRouter(prefix="/stores/{store_id}", tags=["orders"])
 async def create_order(
     store_id: uuid.UUID,
     data: OrderCreate,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     user: CurrentUser | None = Depends(get_optional_user),
 ):
+    store_result = await db.execute(select(Store).where(Store.id == store_id))
+    store = store_result.scalar_one_or_none()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+
+    onboarding_status = await get_store_onboarding_status(db=db, store=store)
+    if not onboarding_status.onboarding_complete:
+        response.headers["X-Store-Onboarding-Warning"] = (
+            f"Store onboarding incomplete. Next required step: {onboarding_status.next_step_id or 'unknown'}"
+        )
+
     # Calculate next order number for this store
     result = await db.execute(
         select(func.coalesce(func.max(Order.order_number), 0)).where(Order.store_id == store_id)

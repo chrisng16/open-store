@@ -22,6 +22,8 @@ export function StoreSwitcher() {
     const pathname = usePathname()
     const { data, isLoading } = useStoresQuery()
 
+    console.log("stores-switcher")
+
     const stores = React.useMemo(
         () =>
             (data ?? []).map((store) => ({
@@ -32,8 +34,6 @@ export function StoreSwitcher() {
         [data]
     )
 
-    const [activeStoreId, setActiveStoreId] = React.useState<string | null>(null)
-
     const routeStoreId = React.useMemo(() => {
         if (!pathname) return null
         const parts = pathname.split("/").filter(Boolean)
@@ -42,21 +42,17 @@ export function StoreSwitcher() {
         return parts[1]
     }, [pathname])
 
-    React.useEffect(() => {
-        if (routeStoreId && stores.some((store) => store.id === routeStoreId)) {
-            setActiveStoreId(routeStoreId)
-            return
+    const activeStore = React.useMemo(() => {
+        if (stores.length === 0) return null
+        if (routeStoreId) {
+            const fromRoute = stores.find((store) => store.id === routeStoreId)
+            if (fromRoute) return fromRoute
         }
-
-        if (!activeStoreId && stores.length > 0) {
-            setActiveStoreId(stores[0].id)
-        }
-    }, [stores, activeStoreId, routeStoreId])
+        return stores[0]
+    }, [stores, routeStoreId])
 
     const handleSelectStore = React.useCallback(
         (storeId: string) => {
-            setActiveStoreId(storeId)
-
             const parts = pathname.split("/").filter(Boolean)
             if (parts[0] === "dashboard" && parts.length >= 2 && parts[1] !== "store") {
                 const tail = parts.slice(2).join("/")
@@ -70,8 +66,6 @@ export function StoreSwitcher() {
         [pathname, router]
     )
 
-    const activeStore = stores.find((store) => store.id === activeStoreId) ?? stores[0]
-
     if (isLoading || !activeStore) {
 
         return <div className="flex items-center gap-2 p-2">
@@ -80,8 +74,6 @@ export function StoreSwitcher() {
         </div>
 
     }
-    console.log("Active store:", routeStoreId)
-
     return (
         routeStoreId && <DropdownMenu>
             <DropdownMenuTrigger asChild>

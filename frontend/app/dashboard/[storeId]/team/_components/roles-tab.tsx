@@ -19,10 +19,7 @@ type RolesTabProps = {
     roles: TeamRole[];
     actorPriority: number;
     drafts: Record<string, RoleDraft>;
-    isSaving: boolean;
     onDraftChange: (roleId: string, patch: Partial<RoleDraft>) => void;
-    onDiscard: () => void;
-    onSave: () => void;
 };
 
 function permissionCount(role: TeamRole, draft: RoleDraft | undefined) {
@@ -33,10 +30,7 @@ export function RolesTab({
     roles,
     actorPriority,
     drafts,
-    isSaving,
     onDraftChange,
-    onDiscard,
-    onSave,
 }: RolesTabProps) {
     const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
     const [roleSheetOpen, setRoleSheetOpen] = useState(false);
@@ -127,14 +121,7 @@ export function RolesTab({
                 />
             ) : null}
 
-            <div className="sticky bottom-0 z-20 flex justify-end gap-2 rounded-md border bg-background/95 p-3 backdrop-blur">
-                <Button variant="outline" onClick={onDiscard} disabled={!isDirty || isSaving}>
-                    Discard
-                </Button>
-                <Button onClick={onSave} disabled={!isDirty || isSaving}>
-                    {isSaving ? "Saving..." : "Save changes"}
-                </Button>
-            </div>
+
         </div>
     );
 }

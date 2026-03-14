@@ -34,8 +34,7 @@ export default function MenuEditorPage({
     const [productToDelete, setProductToDelete] = useState<ProductRow | null>(null);
     const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
     const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
-    const { openProductCreate, openProductEdit } = useUIStore();
-    const { openProductCreate, openProductEdit } = useProductDialogActions();
+    const { openProductEdit } = useProductDialogActions();
 
     const { data, isPending, refetch } = useQuery({
         queryKey: ["menu-editor", storeId],

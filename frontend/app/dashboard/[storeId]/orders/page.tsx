@@ -32,7 +32,7 @@ type Order = {
     id: string;
     orderNumber: number;
     status: string;
-    total: number;
+    totalAmount: number;
     customerName: string | null;
     customerEmail: string | null;
     items: OrderItem[];
@@ -63,7 +63,7 @@ export default function OrdersPage({
 
     const updateStatusMutation = useMutation({
         mutationFn: async ({ orderId, newStatus }: { orderId: string; newStatus: string }) => {
-            await fetchWithAccessToken<void>(`/stores/${storeId}/orders/${orderId}`, {
+            await fetchWithAccessToken<void>(`/stores/${storeId}/orders/${orderId}/status`, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
@@ -75,6 +75,8 @@ export default function OrdersPage({
             void refetch();
         },
     });
+
+    console.log("Orders:", orders);
 
     if (isPending)
         return <div className="p-6 text-muted-foreground">Loading orders...</div>;
@@ -114,7 +116,7 @@ export default function OrdersPage({
                                             ?.map((i) => `${i.quantity}x ${i.productName}`)
                                             .join(", ")}
                                     </TableCell>
-                                    <TableCell>${Number(order.total).toFixed(2)}</TableCell>
+                                    <TableCell>${Number(order.totalAmount / 100).toFixed(2)}</TableCell>
                                     <TableCell>
                                         <Select
                                             value={order.status}

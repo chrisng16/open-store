@@ -8,6 +8,7 @@ import Link from 'next/link'
 
 export default function StoreCardDisplay() {
     const { data, isLoading } = useStoresQuery()
+
     if (isLoading) {
         return (<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => <StoreCardSkeleton key={i} />)}
@@ -39,7 +40,7 @@ export default function StoreCardDisplay() {
 
 function StoreCard({ id, name, slug }: Store) {
     return (
-        <Link href={`/dashboard/${id}`} className="block">
+        <Link href={`/dashboard/${id}/onboarding`} className="block">
             <Card>
                 <CardHeader className='gap-0'>
                     <CardTitle className='font-medium text-lg'>{name}</CardTitle>
