@@ -1,6 +1,7 @@
 import uuid
+from datetime import date, datetime, time, timezone
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -115,8 +116,11 @@ async def create_order(
 async def list_orders(
     ctx: StoreContext = Depends(require_role(MemberRole.staff)),
     db: AsyncSession = Depends(get_db),
-    status_filter: OrderStatus | None = None,
-    limit: int = 50,
+    status: str | None = None,
+    created_from: date | None = None,
+    created_to: date | None = None,
+    q: str | None = None,
+    limit: int = 500,
     offset: int = 0,
 ):
     query = (
@@ -127,8 +131,30 @@ async def list_orders(
         .limit(limit)
         .offset(offset)
     )
-    if status_filter:
-        query = query.where(Order.status == status_filter)
+    if status:
+        valid_statuses = [
+            OrderStatus(s.strip())
+            for s in status.split(",")
+            if s.strip() in {e.value for e in OrderStatus}
+        ]
+        if valid_statuses:
+            query = query.where(Order.status.in_(valid_statuses))
+    if created_from:
+        start_dt = datetime.combine(created_from, time.min).replace(tzinfo=timezone.utc)
+        query = query.where(Order.created_at >= start_dt)
+    if created_to:
+        end_dt = datetime.combine(created_to, time.max).replace(tzinfo=timezone.utc)
+        query = query.where(Order.created_at <= end_dt)
+    if q:
+        term = f"%{q.strip()}%"
+        query = query.where(
+            or_(
+                Order.customer_name.ilike(term),
+                Order.customer_email.ilike(term),
+                Order.customer_phone.ilike(term),
+                cast(Order.order_number, String).ilike(term),
+            )
+        )
     result = await db.execute(query)
     return result.scalars().unique().all()
 

@@ -160,8 +160,8 @@ export default function PaymentsPage({
             <div className="sticky top-0 z-20 border-b bg-background-elevated/70 backdrop-blur rounded-t-md">
                 <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 py-3 md:px-6">
                     <div>
-                        <h1 className="text-lg font-semibold">Payments</h1>
-                        <p className="text-sm text-muted-foreground">
+                        <h1 className="font-semibold">Payments</h1>
+                        <p className="text-xs text-muted-foreground">
                             Manage Stripe Connect onboarding and payment capabilities.
                         </p>
                     </div>

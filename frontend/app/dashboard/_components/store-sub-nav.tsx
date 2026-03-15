@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { useTeamMembersQuery } from "@/queries/team";
 import { useQuery } from "@tanstack/react-query";
-import { CreditCard, ExternalLink, FileUp, Package, ShoppingBag, Zap } from "lucide-react";
+import { BarChart2, CreditCard, ExternalLink, FileUp, Package, ShoppingBag, Zap } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -47,6 +47,7 @@ export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: 
         { href: `/dashboard/${storeId}/orders`, label: "Orders", icon: ShoppingBag },
         { href: `/dashboard/${storeId}/products`, label: "Products", icon: Package },
         { href: `/dashboard/${storeId}/ai-import`, label: "AI Import", icon: FileUp },
+        { href: `/dashboard/${storeId}/analytics`, label: "Analytics", icon: BarChart2 },
         ...(isOwner
             ? [{ href: `/dashboard/${storeId}/payments`, label: "Payments", icon: CreditCard }]
             : []),
@@ -56,12 +57,12 @@ export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: 
             <div className="flex items-center justify-between px-6 py-3">
                 <div className="flex flex-col">
                     {
-                        pending ? <Skeleton className="h-7 w-32" /> : <h2 className="font-semibold text-xl">{storeName || "Store"}</h2>
+                        pending ? <Skeleton className="h-4 w-32" /> : <h1 className="text-base font-semibold">{storeName || "Store"}</h1>
                     }
                     <Link
                         href={`/store/${storeSlug}/`}
                         target="_blank"
-                        className="text-sm text-muted-foreground hover:text-foreground flex items-center"
+                        className="text-xs text-muted-foreground hover:text-foreground flex items-center"
                     >
                         View Store <ExternalLink className="ml-1 h-3 w-3" />
                     </Link>

@@ -62,12 +62,15 @@ type DataTableProps<TData, TValue> = {
         selectedCount: number;
         clearSelection: () => void;
     }) => ReactNode;
+    showDefaultSearch?: boolean;
+    showViewOptions?: boolean;
     onSelectionChange?: (params: {
         selectedRows: TData[];
         selectedCount: number;
         selectedRowIds: Set<string>;
         clearSelection: () => void;
     }) => void;
+    onRowClick?: (row: TData) => void;
     rowSelectionDisabled?: boolean;
 };
 
@@ -96,7 +99,10 @@ export function DataTable<TData, TValue>({
     enableDefaultActionBar = true,
     actionBar,
     renderBulkActions,
+    showDefaultSearch = true,
+    showViewOptions = true,
     onSelectionChange,
+    onRowClick,
     rowSelectionDisabled = false,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>([]);
@@ -184,8 +190,8 @@ export function DataTable<TData, TValue>({
 
     return (
         <div className="pt-3 h-full min-h-0 min-w-0 w-full overflow-hidden flex flex-col">
-            {enableDefaultActionBar && <div className="shrink-0 mb-3 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                {searchableColumn ? (
+            {enableDefaultActionBar && (showViewOptions || showDefaultSearch) ? <div className="shrink-0 mb-3 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                {searchableColumn && showDefaultSearch ? (
                     <Input
                         placeholder={searchPlaceholder}
                         value={(searchableColumn.getFilterValue() as string) ?? ""}
@@ -200,30 +206,32 @@ export function DataTable<TData, TValue>({
                         selectedCount,
                         clearSelection: () => table.resetRowSelection(),
                     }) : null}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="sm:ml-auto">
-                                <Settings2 className="size-4" /> View
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="min-w-48">
-                            {table
-                                .getAllColumns()
-                                .filter((column) => column.getCanHide())
-                                .map((column) => (
-                                    <DropdownMenuCheckboxItem
-                                        key={column.id}
-                                        className="capitalize"
-                                        checked={column.getIsVisible()}
-                                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                                    >
-                                        {formatColumnLabel(column.id)}
-                                    </DropdownMenuCheckboxItem>
-                                ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    {showViewOptions ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="sm:ml-auto">
+                                    <Settings2 className="size-4" /> View
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-48">
+                                {table
+                                    .getAllColumns()
+                                    .filter((column) => column.getCanHide())
+                                    .map((column) => (
+                                        <DropdownMenuCheckboxItem
+                                            key={column.id}
+                                            className="capitalize"
+                                            checked={column.getIsVisible()}
+                                            onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                                        >
+                                            {formatColumnLabel(column.id)}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
                 </div>
-            </div>}
+            </div> : null}
             {actionBar && <div className="shrink-0 mb-3 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">{actionBar}</div>}
             {/* Table */}
             <div className="overflow-y-auto overscroll-none overflow-x-auto rounded-md shadow-xs border bg-background-elevated flex-1 min-h-0 min-w-0 w-full">
@@ -257,7 +265,7 @@ export function DataTable<TData, TValue>({
                             </TableRow>
                         ) : table.getRowModel().rows.length ? (
                             table.getRowModel().rows.map((row) => (
-                                <TableRow key={row.id} data-state={row.getIsSelected() ? "selected" : undefined}>
+                                <TableRow key={row.id} data-state={row.getIsSelected() ? "selected" : undefined} onClick={() => onRowClick?.(row.original)}>
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}
                                             style={{
