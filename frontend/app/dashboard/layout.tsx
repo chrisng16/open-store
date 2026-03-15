@@ -1,44 +1,14 @@
-"use client";
-
-import { AppSidebar } from "@/components/app-sidebar";
-import { CreateStoreSidebar } from "@/components/create-store-sidebar";
-import PageTransition from "@/components/page-transition";
 import { SiteHeader } from "@/components/site-header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { usePathname } from "next/navigation";
+import { DashboardShell } from "./_components/dashboard-shell";
 
 export default function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const pathname = usePathname();
-    const isCreateStorePage = pathname === "/dashboard/store/new";
-
     return (
-        <div className="[--header-height:calc(--spacing(14))] max-h-screen overflow-hidden overscroll-none">
-            <SidebarProvider className="flex flex-col">
-                <SiteHeader />
-                <div className="flex min-w-0">
-                    {isCreateStorePage ? (
-                        <CreateStoreSidebar collapsible="icon" />
-                    ) : (
-                        <AppSidebar collapsible="icon" />
-                    )}
-
-                    <SidebarInset className="bg-background-elevated min-w-0">
-                        <div
-                            className={
-                                isCreateStorePage
-                                    ? "h-[calc(100dvh-var(--header-height))] overflow-y-auto overscroll-none flex flex-col"
-                                    : "h-[calc(100dvh-var(--header-height)-0.5rem)] overflow-y-auto overflow-x-hidden overscroll-none flex flex-col"
-                            }
-                        >
-                            <PageTransition>{children}</PageTransition>
-                        </div>
-                    </SidebarInset>
-                </div>
-            </SidebarProvider>
-        </div>
+        <DashboardShell header={<SiteHeader />}>
+            {children}
+        </DashboardShell>
     );
 }

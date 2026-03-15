@@ -1,11 +1,13 @@
-"use client"
 import { SearchForm } from "@/components/search-form"
+import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
 import { NavUser } from "./nav-user"
 import SidebarTrigger from "./sidebar-trigger"
 import { StoreSwitcher } from "./store-switcher"
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
   return (
     <header className="sticky top-0 z-50 flex w-full items-center">
@@ -18,7 +20,7 @@ export function SiteHeader() {
         </div>
         <div className="flex items-center gap-4">
           <SearchForm className="w-full max-w-sm hidden sm:block" />
-          <NavUser />
+          <NavUser user={user} />
         </div>
       </div>
     </header>

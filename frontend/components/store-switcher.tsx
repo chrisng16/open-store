@@ -11,8 +11,7 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
-    DropdownMenuShortcut,
-    DropdownMenuTrigger,
+    DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { Button } from "./ui/button"
 import { Skeleton } from "./ui/skeleton"
@@ -21,8 +20,6 @@ export function StoreSwitcher() {
     const router = useRouter()
     const pathname = usePathname()
     const { data, isLoading } = useStoresQuery()
-
-    console.log("stores-switcher")
 
     const stores = React.useMemo(
         () =>
@@ -101,7 +98,6 @@ export function StoreSwitcher() {
                             <span className="text-xs font-medium">{store.name.slice(0, 1).toUpperCase()}</span>
                         </div>
                         {store.name}
-                        <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
                     </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />

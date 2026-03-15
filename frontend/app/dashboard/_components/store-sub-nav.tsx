@@ -1,11 +1,17 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { useTeamMembersQuery } from "@/queries/team";
 import { useQuery } from "@tanstack/react-query";
-import { CreditCard, ExternalLink, FileUp, Package, ShoppingBag } from "lucide-react";
+import { CreditCard, ExternalLink, FileUp, Package, ShoppingBag, Zap } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -28,8 +34,6 @@ export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: 
         staleTime: 5 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
     });
-
-    console.log("store-sub-nav")
 
     const isOwner = useMemo(() => {
         if (!currentUserIdQuery.data || !membersQuery.data) {
@@ -62,20 +66,38 @@ export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: 
                         View Store <ExternalLink className="ml-1 h-3 w-3" />
                     </Link>
                 </div>
-                <div className="flex gap-1">
-                    {navItems.map((item) => {
-                        return (
+                <div className="flex items-center gap-1">
+                    <div className="hidden sm:flex md:hidden lg:flex gap-1">
+                        {navItems.map((item) => (
                             <Link key={item.href} href={item.href}>
-                                <Button
-                                    variant={"ghost"}
-                                    size="sm"
-                                >
-                                    <item.icon className="mr-1 h-4 w-4" />
+                                <Button variant={"ghost"} size="sm">
+                                    <item.icon />
                                     {item.label}
                                 </Button>
                             </Link>
-                        );
-                    })}
+                        ))}
+                    </div>
+
+                    <div className="flex sm:hidden md:flex lg:hidden">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                    <Zap />
+                                    Quick Links
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                {navItems.map((item) => (
+                                    <DropdownMenuItem key={item.href} asChild>
+                                        <Link href={item.href} className="flex items-center gap-2">
+                                            <item.icon className="h-4 w-4" />
+                                            {item.label}
+                                        </Link>
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </div>
             </div>
         </div>

@@ -36,7 +36,6 @@ export function NavGroup({
     return `/dashboard/${storeId}${suffix}`;
   };
 
-  console.log("Rendering NavGroup with activeRoute:", activeRoute, items);
   return (
     <SidebarGroup className="pt-0">
       <SidebarGroupLabel className="truncate">{navGroupTitle}</SidebarGroupLabel>

@@ -24,31 +24,18 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { createClient } from "@/lib/supabase/client"
 import { User } from '@supabase/supabase-js'
-import { useEffect, useState } from "react"
 import { ThemeSwitcherSubmenu } from "./theme-switcher-submenu"
-import { Skeleton } from "./ui/skeleton"
 
-export function NavUser() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+interface NavUserProps {
+  user: User | null;
+}
+
+export function NavUser({ user }: NavUserProps) {
   const supabase = createClient();
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
-    };
-
-    fetchUser();
-  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/";
-  }
-  if (loading) {
-    return <Skeleton className="size-8" />;
   }
 
   if (!user) {
@@ -58,22 +45,22 @@ export function NavUser() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild className="shrink-0">
-        <Avatar className="h-8 w-8 rounded-lg">
-          <AvatarImage src={user.user_metadata?.avatar} alt={user.user_metadata?.name} />
-          <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+        <Avatar className="rounded-md">
+          <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.name} referrerPolicy="no-referrer" />
+          <AvatarFallback>{user.user_metadata?.name?.[0]}</AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+        className="min-w-56"
         side='bottom'
         align="end"
         sideOffset={4}
       >
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-            <Avatar className="h-8 w-8 rounded-lg">
-              <AvatarImage src={user.user_metadata?.avatar} alt={user.user_metadata?.name} />
-              <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+            <Avatar className="rounded-md">
+              <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.name} referrerPolicy="no-referrer" />
+              <AvatarFallback>{user.user_metadata?.name?.[0]}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user.user_metadata?.name}</span>
