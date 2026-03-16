@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -80,8 +80,9 @@ async def list_categories(
         .limit(window.page_size)
         .offset(window.offset)
     )
+    category_items = [CategoryResponse.model_validate(category) for category in result.scalars().all()]
     return CategoriesPageResponse(
-        items=result.scalars().all(),
+        items=category_items,
         total=window.total,
         page=window.page,
         page_size=window.page_size,
@@ -115,8 +116,23 @@ async def update_category(
     category = result.scalar_one_or_none()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
+
+    was_active = category.is_active
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(category, field, value)
+
+    # Hiding a category also hides all products assigned to it.
+    if was_active and category.is_active is False:
+        await db.execute(
+            update(Product)
+            .where(
+                Product.store_id == ctx.store.id,
+                Product.category_id == category.id,
+                Product.is_active.is_(True),
+            )
+            .values(is_active=False)
+        )
+
     await db.flush()
     await db.refresh(category)
     return category
@@ -197,8 +213,12 @@ async def list_products(
         .limit(window.page_size)
         .offset(window.offset)
     )
+    product_items = [
+        ProductListItemResponse.model_validate(product)
+        for product in result.scalars().unique().all()
+    ]
     return ProductsPageResponse(
-        items=result.scalars().unique().all(),
+        items=product_items,
         total=window.total,
         page=window.page,
         page_size=window.page_size,

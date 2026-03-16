@@ -22,11 +22,15 @@ type Category = {
 
 async function getCategories(storeId: string): Promise<Category[]> {
     try {
-        const res = await fetch(`${API_URL}/stores/${storeId}/categories`, {
-            next: { revalidate: 30 },
-        });
+        const res = await fetch(
+            `${API_URL}/stores/${storeId}/categories?status_filter=active&page=1&page_size=500`,
+            {
+                next: { revalidate: 30 },
+            }
+        );
         if (!res.ok) return [];
-        return res.json();
+        const data = await res.json();
+        return Array.isArray(data) ? data : (data.items ?? []);
     } catch {
         return [];
     }
@@ -34,11 +38,15 @@ async function getCategories(storeId: string): Promise<Category[]> {
 
 async function getProducts(storeId: string): Promise<Product[]> {
     try {
-        const res = await fetch(`${API_URL}/stores/${storeId}/products`, {
-            next: { revalidate: 30 },
-        });
+        const res = await fetch(
+            `${API_URL}/stores/${storeId}/products?page=1&page_size=500`,
+            {
+                next: { revalidate: 30 },
+            }
+        );
         if (!res.ok) return [];
-        return res.json();
+        const data = await res.json();
+        return Array.isArray(data) ? data : (data.items ?? []);
     } catch {
         return [];
     }
@@ -74,15 +82,18 @@ export default async function MenuPage({
         getProducts(store.id),
     ]);
 
+    const activeCategoryIds = new Set(categories.map((cat) => cat.id));
+    const visibleProducts = products.filter(
+        (product) => !product.category_id || activeCategoryIds.has(product.category_id)
+    );
+
     const productsByCategory = categories.map((cat) => ({
         ...cat,
-        products: products.filter((p) => p.category_id === cat.id),
+        products: visibleProducts.filter((p) => p.category_id === cat.id),
     }));
 
     // Include uncategorized products
-    const uncategorized = products.filter(
-        (p) => !p.category_id || !categories.some((c) => c.id === p.category_id)
-    );
+    const uncategorized = visibleProducts.filter((p) => !p.category_id);
 
     const hasRequestedCategory =
         category && categories.some((cat) => cat.id === category);
@@ -99,7 +110,7 @@ export default async function MenuPage({
 
     return (
         <>
-            {products.length === 0 ? (
+            {visibleProducts.length === 0 ? (
                 <div className="py-16 text-center">
                     <p className="text-lg text-muted-foreground">
                         This store hasn&apos;t added any items yet
@@ -111,7 +122,11 @@ export default async function MenuPage({
                     slug={slug}
                     storeName={store.name}
                     storeDescription={store.description}
-                    sections={sections.length > 0 ? sections : [{ id: "all", name: "Menu", description: null, products }]}
+                    sections={
+                        sections.length > 0
+                            ? sections
+                            : [{ id: "all", name: "Menu", description: null, products: visibleProducts }]
+                    }
                     defaultCategory={defaultTab}
                 />
             )}
