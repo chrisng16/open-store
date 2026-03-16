@@ -316,13 +316,13 @@ export default function TeamPage({
 
                         <div className="flex items-center gap-2 pr-2">
                             {activeTab === "roles" && canManageRoles ? (
-                                <Button variant="outline" size="sm" onClick={() => setCreateRoleSheetOpen(true)}>
+                                <Button className="rounded-full" variant="outline" size="sm" onClick={() => setCreateRoleSheetOpen(true)}>
                                     <Plus className="h-4 w-4" />
                                     Add role
                                 </Button>
                             ) : null}
                             {canManageInvites ? (
-                                <Button size="sm" onClick={() => setInviteDialogOpen(true)}>
+                                <Button className="rounded-full" size="sm" onClick={() => setInviteDialogOpen(true)}>
                                     <UserPlus className="h-4 w-4" />
                                     Add member
                                 </Button>

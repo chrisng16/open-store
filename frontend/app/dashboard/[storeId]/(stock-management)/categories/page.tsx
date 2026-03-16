@@ -250,6 +250,7 @@ export default function CategoriesPage({
                                 setBulkDeleteIds(selectedRows.map((row) => row.id));
                                 setIsBulkDeleteOpen(true);
                             }}
+                            className="rounded-full"
                         >
                             <Trash2 />
                             {selectedRows.length > 0 ? ` Delete ${selectedRows.length} item${selectedRows.length === 1 ? "" : "s"}` : "Delete"}

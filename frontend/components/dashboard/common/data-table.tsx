@@ -16,7 +16,7 @@ import {
     useReactTable,
     type VisibilityState,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Settings2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search, Settings2 } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import {
     Select,
     SelectContent,
@@ -225,6 +226,10 @@ export function DataTable<TData, TValue>({
         [searchColumnId, table]
     );
     const shouldRenderSearch = showDefaultSearch && (!!searchableColumn || !!onSearchValueChange);
+    const currentSearchValue = onSearchValueChange
+        ? (searchValue ?? "")
+        : ((searchableColumn?.getFilterValue() as string) ?? "");
+    const [searchInput, setSearchInput] = useState(currentSearchValue);
 
     const selectedRows = table.getSelectedRowModel().rows.map((row) => row.original);
     const selectedCount = selectedRows.length;
@@ -239,23 +244,46 @@ export function DataTable<TData, TValue>({
         });
     }, [onSelectionChange, rowSelection, selectedCount, selectedRows, table]);
 
+    useEffect(() => {
+        setSearchInput(currentSearchValue);
+    }, [currentSearchValue]);
+
+    useEffect(() => {
+        if (!shouldRenderSearch) return;
+        if (searchInput === currentSearchValue) return;
+
+        const timeoutId = window.setTimeout(() => {
+            if (onSearchValueChange) {
+                onSearchValueChange(searchInput);
+                return;
+            }
+
+            searchableColumn?.setFilterValue(searchInput);
+        }, 250);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [
+        currentSearchValue,
+        onSearchValueChange,
+        searchInput,
+        searchableColumn,
+        shouldRenderSearch,
+    ]);
+
     return (
         <div className="pt-3 h-full min-h-0 min-w-0 w-full overflow-hidden flex flex-col">
             {enableDefaultActionBar && (showViewOptions || showDefaultSearch) ? <div className="shrink-0 mb-3 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 {shouldRenderSearch ? (
-                    <Input
-                        placeholder={searchPlaceholder}
-                        value={onSearchValueChange ? (searchValue ?? "") : (searchableColumn?.getFilterValue() as string) ?? ""}
-                        onChange={(event) => {
-                            if (onSearchValueChange) {
-                                onSearchValueChange(event.target.value);
-                                return;
-                            }
-
-                            searchableColumn?.setFilterValue(event.target.value);
-                        }}
-                        className="w-full sm:max-w-xs"
-                    />
+                    <InputGroup className="w-full sm:max-w-xs rounded-full h-8 text-xs">
+                        <InputGroupAddon>
+                            <Search />
+                        </InputGroupAddon>
+                        <InputGroupInput
+                            placeholder={searchPlaceholder}
+                            value={searchInput}
+                            onChange={(event) => setSearchInput(event.target.value)}
+                        />
+                    </InputGroup>
                 ) : <div className="flex-1" />}
 
                 <div className="flex items-center gap-2">
@@ -267,7 +295,7 @@ export function DataTable<TData, TValue>({
                     {showViewOptions ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="sm:ml-auto">
+                                <Button variant="outline" size="sm" className="sm:ml-auto rounded-full">
                                     <Settings2 className="size-4" /> View
                                 </Button>
                             </DropdownMenuTrigger>

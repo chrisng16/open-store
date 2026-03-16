@@ -63,11 +63,11 @@ export default function StockManagementSubNav() {
     return (
         <div className="border-b rounded-t-md bg-background-elevated/70 backdrop-blur">
             <div className="flex items-center justify-between px-6 py-3">
-                <div className="">
-                    <h1 className="font-semibold"> Manage {directory === 'categories' ? 'Categories' : 'Products'}</h1>
-                    <p className="text-xs text-muted-foreground">Create and manage product {directory === 'categories' ? 'categories' : 'listings'}</p>
-                </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                    <>
+                        <h1 className="font-semibold"> Manage {directory === 'categories' ? 'Categories' : 'Products'}</h1>
+                        <p className="text-xs text-muted-foreground sr-only">Create and manage product {directory === 'categories' ? 'categories' : 'listings'}</p>
+                    </>
                     <>
                         <div className="hidden xl:block">
                             <Tabs
@@ -89,7 +89,7 @@ export default function StockManagementSubNav() {
                                 value={statusFilter}
                                 onValueChange={(value) => handleStatusFilterChange(value as StatusFilterValue)}
                             >
-                                <SelectTrigger className="h-8 w-36">
+                                <SelectTrigger className="h-8 w-30">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent align="end" position="popper">
@@ -102,6 +102,8 @@ export default function StockManagementSubNav() {
                             </Select>
                         </div>
                     </>
+                </div>
+                <div className="flex items-center gap-2">
                     {
                         directory === 'products' && (
                             <Button variant="outline" size={"sm"} asChild>

@@ -19,9 +19,9 @@ export default function ImportSubNav({ storeId, uploadMutation, handleUpload }: 
                         <Button asChild disabled={uploadMutation.isPending} size={"sm"}>
                             <span>
                                 {uploadMutation.isPending ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader2 className="size-4 animate-spin" />
                                 ) : (
-                                    <FileUp className="mr-2 h-4 w-4" />
+                                    <FileUp className="size-4" />
                                 )}
                                 {uploadMutation.isPending ? "Uploading..." : "Upload Menu"}
                             </span>
