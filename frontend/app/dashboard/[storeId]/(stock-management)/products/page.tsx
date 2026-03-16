@@ -10,8 +10,21 @@ import {
 } from "@/components/dashboard/common/products-table-columns";
 import { Button } from "@/components/ui/button";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
+import { buildListQueryKey, useListFilters, type ListFilterConfig } from "@/lib/list-filters";
+import {
+    applyPaginationApiParams,
+    applyPaginationSearchParams,
+    applySortingSearchParam,
+    arePaginationParamsEqual,
+    areSortingParamsEqual,
+    DEFAULT_PAGE,
+    parsePaginationSearchParams,
+    parseSortingSearchParam,
+    type PaginatedResponse,
+} from "@/lib/pagination";
 import { useProductDialogActions } from "@/stores/ui-store";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { SortingState } from "@tanstack/react-table";
 import { Trash2 } from "lucide-react";
 import { use, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -21,6 +34,110 @@ type Category = {
     name: string;
     description: string | null;
     sortOrder: number;
+};
+
+type ProductFilters = {
+    q: string;
+    sorting: SortingState;
+    page: number;
+    pageSize: number;
+    statusFilter: "all" | "active" | "hidden";
+};
+
+const PRODUCT_SORTABLE_COLUMNS = ["name", "unitAmount", "isActive"] as const;
+const DEFAULT_PRODUCT_SORT = { id: "name", desc: false } as const;
+
+function parseProductsFilters(searchParams: URLSearchParams): ProductFilters {
+    const pagination = parsePaginationSearchParams(searchParams);
+    const sorting = parseSortingSearchParam(
+        searchParams.get("sort"),
+        PRODUCT_SORTABLE_COLUMNS,
+        DEFAULT_PRODUCT_SORT
+    );
+    const rawStatus = searchParams.get("status");
+    const statusFilter =
+        rawStatus === "all" || rawStatus === "active" || rawStatus === "hidden"
+            ? rawStatus
+            : "all";
+
+    return {
+        q: (searchParams.get("q") ?? "").trim(),
+        sorting,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        statusFilter,
+    };
+}
+
+function buildProductsSearchParams(filters: ProductFilters): URLSearchParams {
+    const params = new URLSearchParams();
+
+    if (filters.q) {
+        params.set("q", filters.q);
+    }
+    if (filters.statusFilter !== "all") {
+        params.set("status", filters.statusFilter);
+    }
+
+    applySortingSearchParam(params, filters.sorting, DEFAULT_PRODUCT_SORT);
+    applyPaginationSearchParams(params, {
+        page: filters.page,
+        pageSize: filters.pageSize,
+    });
+
+    return params;
+}
+
+function buildProductsApiParams(filters: ProductFilters): URLSearchParams {
+    const params = new URLSearchParams();
+
+    applyPaginationApiParams(params, {
+        page: filters.page,
+        pageSize: filters.pageSize,
+    });
+
+    if (filters.q) {
+        params.set("q", filters.q);
+    }
+
+    params.set("status_filter", filters.statusFilter);
+    applySortingSearchParam(params, filters.sorting, DEFAULT_PRODUCT_SORT);
+
+    return params;
+}
+
+function areProductFiltersEqual(left: ProductFilters, right: ProductFilters) {
+    return (
+        left.q === right.q &&
+        left.statusFilter === right.statusFilter &&
+        arePaginationParamsEqual(left, right) &&
+        areSortingParamsEqual(left.sorting, right.sorting)
+    );
+}
+
+const productFiltersConfig: ListFilterConfig<
+    ProductFilters,
+    {
+        q: string;
+        statusFilter: ProductFilters["statusFilter"];
+        sort: string | null;
+        page: number;
+        pageSize: number;
+    }
+> = {
+    parse: parseProductsFilters,
+    serialize: buildProductsSearchParams,
+    equals: areProductFiltersEqual,
+    toApiParams: buildProductsApiParams,
+    toQueryShape: (filters) => ({
+        q: filters.q,
+        statusFilter: filters.statusFilter,
+        sort: filters.sorting[0]
+            ? `${filters.sorting[0].id}:${filters.sorting[0].desc ? "desc" : "asc"}`
+            : null,
+        page: filters.page,
+        pageSize: filters.pageSize,
+    }),
 };
 
 export default function MenuEditorPage({
@@ -34,21 +151,25 @@ export default function MenuEditorPage({
     const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
     const queryClient = useQueryClient();
     const { openProductEdit } = useProductDialogActions();
+    const { filters, updateFilters, toApiParams, toQueryShape } = useListFilters(productFiltersConfig);
 
     const { data, isPending, refetch } = useQuery({
-        queryKey: ["menu-editor", storeId],
+        queryKey: buildListQueryKey("menu-editor", storeId, toQueryShape(filters)),
         queryFn: async () => {
-            const [categories, products] = await Promise.all([
-                fetchWithAccessToken<Category[]>(`/stores/${storeId}/categories`),
-                fetchWithAccessToken<ProductRow[]>(`/stores/${storeId}/products`),
+            const apiParams = toApiParams(filters);
+            const [categories, productsPage] = await Promise.all([
+                fetchWithAccessToken<PaginatedResponse<Category>>(`/stores/${storeId}/categories?page=1&page_size=500`),
+                fetchWithAccessToken<PaginatedResponse<ProductRow>>(`/stores/${storeId}/products?${apiParams}`),
             ]);
-            return { categories, products };
+            return { categories: categories.items, productsPage };
         },
         enabled: !!storeId,
     });
 
     const categories = data?.categories ?? [];
-    const products = data?.products ?? [];
+    const products = data?.productsPage.items ?? [];
+    const pageCount = data?.productsPage.pageCount ?? 1;
+    const totalProducts = data?.productsPage.total ?? 0;
 
     const categoryOptions = useMemo<ProductCategoryOption[]>(
         () => categories.map((category) => ({ id: category.id, name: category.name })),
@@ -152,6 +273,17 @@ export default function MenuEditorPage({
                     isLoading={isPending}
                     enableRowSelection
                     getRowId={(row) => row.id}
+                    onRowClick={(product) => {
+                        const initialCategoryName =
+                            categoryOptions.find((category) => category.id === product.categoryId)?.name ?? "";
+
+                        queryClient.setQueryData(
+                            ["dialog-product-detail", storeId, product.id],
+                            product
+                        );
+
+                        openProductEdit(toProductFormData(product, initialCategoryName));
+                    }}
                     renderBulkActions={({ selectedRows }) => (
                         <Button
                             variant={selectedRows.length > 0 ? "destructive" : "outline"}
@@ -169,6 +301,30 @@ export default function MenuEditorPage({
                     )}
                     loadingText="Loading products..."
                     searchColumnId="name"
+                    searchValue={filters.q}
+                    onSearchValueChange={(value) =>
+                        updateFilters((current) => ({ ...current, q: value, page: DEFAULT_PAGE }))
+                    }
+                    sorting={filters.sorting}
+                    onSortingChange={(sorting) =>
+                        updateFilters((current) => ({ ...current, sorting: sorting.slice(0, 1), page: DEFAULT_PAGE }))
+                    }
+                    manualSorting
+                    pagination={{
+                        pageIndex: Math.max(filters.page - 1, 0),
+                        pageSize: filters.pageSize,
+                    }}
+                    onPaginationChange={({ pageIndex, pageSize }) => {
+                        const pageSizeChanged = pageSize !== filters.pageSize;
+                        updateFilters((current) => ({
+                            ...current,
+                            page: pageSizeChanged ? DEFAULT_PAGE : pageIndex + 1,
+                            pageSize,
+                        }));
+                    }}
+                    manualPagination
+                    pageCount={pageCount}
+                    totalCount={totalProducts}
                     searchPlaceholder="Search products by name..."
                     emptyTitle="No products yet"
                     emptyDescription="Add items manually or use AI Import."

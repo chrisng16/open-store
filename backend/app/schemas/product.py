@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime
 from pydantic import BaseModel, Field
 
+from app.schemas.pagination import PaginationMetadata
+
 
 class CategoryCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -159,3 +161,11 @@ class ProductListItemResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CategoriesPageResponse(PaginationMetadata):
+    items: list[CategoryResponse]
+
+
+class ProductsPageResponse(PaginationMetadata):
+    items: list[ProductListItemResponse]

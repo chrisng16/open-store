@@ -3,6 +3,7 @@
 import StoreSubNav from "@/app/dashboard/_components/store-sub-nav";
 import { Card, CardContent } from "@/components/ui/card";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
+import type { PaginatedResponse } from "@/lib/pagination";
 import { useQuery } from "@tanstack/react-query";
 import { CircleDollarSign, Clock3, ReceiptText, ShoppingBag } from "lucide-react";
 import { use } from "react";
@@ -146,11 +147,11 @@ function AnalyticsDashboard({ storeId }: { storeId: string }) {
 
     const ordersQuery = useQuery({
         queryKey: ["orders-analytics", storeId],
-        queryFn: () => fetchWithAccessToken<Order[]>(`/stores/${storeId}/orders?limit=500`),
+        queryFn: () => fetchWithAccessToken<PaginatedResponse<Order>>(`/stores/${storeId}/orders?page=1&page_size=500`),
         staleTime: 60_000,
     });
 
-    const orders = ordersQuery.data ?? [];
+    const orders = ordersQuery.data?.items ?? [];
     const metrics = computeMetrics(orders);
     const currency = orders[0]?.currency ?? "USD";
     const decimalPlaces = orders[0]?.decimalPlaces ?? 2;

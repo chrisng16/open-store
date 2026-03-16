@@ -67,6 +67,7 @@ export function getProductsTableColumns({
                 const category = categories.find((item) => item.id === row.categoryId);
                 return category?.name ?? "";
             },
+            enableSorting: false,
             header: ({ column }) => (
                 <DataTableColumnHeader column={column} title="Category" className="-ml-3" />
             ),

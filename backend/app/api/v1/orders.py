@@ -5,6 +5,8 @@ from sqlalchemy import select, func, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.pagination import get_offset_pagination, OffsetPaginationParams, resolve_offset_pagination
+from app.api.sorting import resolve_sort_expression
 from app.database import get_db
 from app.api.deps import (
     get_current_user,
@@ -16,10 +18,45 @@ from app.api.deps import (
 )
 from app.models.store import MemberRole, Store
 from app.models.order import Order, OrderItem, OrderItemOption, OrderStatus
-from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
+from app.schemas.order import OrderCreate, OrderResponse, OrdersPageResponse, OrderStatusUpdate
 from app.services.onboarding import get_store_onboarding_status
 
 router = APIRouter(prefix="/stores/{store_id}", tags=["orders"])
+
+
+def _apply_order_filters(
+    query,
+    *,
+    status: str | None,
+    created_from: date | None,
+    created_to: date | None,
+    q: str | None,
+):
+    if status:
+        valid_statuses = [
+            OrderStatus(s.strip())
+            for s in status.split(",")
+            if s.strip() in {e.value for e in OrderStatus}
+        ]
+        if valid_statuses:
+            query = query.where(Order.status.in_(valid_statuses))
+    if created_from:
+        start_dt = datetime.combine(created_from, time.min).replace(tzinfo=timezone.utc)
+        query = query.where(Order.created_at >= start_dt)
+    if created_to:
+        end_dt = datetime.combine(created_to, time.max).replace(tzinfo=timezone.utc)
+        query = query.where(Order.created_at <= end_dt)
+    if q:
+        term = f"%{q.strip()}%"
+        query = query.where(
+            or_(
+                Order.customer_name.ilike(term),
+                Order.customer_email.ilike(term),
+                Order.customer_phone.ilike(term),
+                cast(Order.order_number, String).ilike(term),
+            )
+        )
+    return query
 
 
 @router.post("/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
@@ -112,7 +149,7 @@ async def create_order(
     return result.scalar_one()
 
 
-@router.get("/orders", response_model=list[OrderResponse])
+@router.get("/orders", response_model=OrdersPageResponse)
 async def list_orders(
     ctx: StoreContext = Depends(require_role(MemberRole.staff)),
     db: AsyncSession = Depends(get_db),
@@ -120,43 +157,62 @@ async def list_orders(
     created_from: date | None = None,
     created_to: date | None = None,
     q: str | None = None,
-    limit: int = 500,
-    offset: int = 0,
+    sort: str | None = None,
+    pagination: OffsetPaginationParams = Depends(get_offset_pagination),
 ):
-    query = (
-        select(Order)
-        .where(Order.store_id == ctx.store.id)
-        .options(selectinload(Order.items).selectinload(OrderItem.options))
-        .order_by(Order.created_at.desc())
-        .limit(limit)
-        .offset(offset)
+    filtered_query = _apply_order_filters(
+        select(Order).where(Order.store_id == ctx.store.id),
+        status=status,
+        created_from=created_from,
+        created_to=created_to,
+        q=q,
     )
-    if status:
-        valid_statuses = [
-            OrderStatus(s.strip())
-            for s in status.split(",")
-            if s.strip() in {e.value for e in OrderStatus}
-        ]
-        if valid_statuses:
-            query = query.where(Order.status.in_(valid_statuses))
-    if created_from:
-        start_dt = datetime.combine(created_from, time.min).replace(tzinfo=timezone.utc)
-        query = query.where(Order.created_at >= start_dt)
-    if created_to:
-        end_dt = datetime.combine(created_to, time.max).replace(tzinfo=timezone.utc)
-        query = query.where(Order.created_at <= end_dt)
-    if q:
-        term = f"%{q.strip()}%"
-        query = query.where(
-            or_(
-                Order.customer_name.ilike(term),
-                Order.customer_email.ilike(term),
-                Order.customer_phone.ilike(term),
-                cast(Order.order_number, String).ilike(term),
-            )
+
+    total_result = await db.execute(
+        filtered_query.with_only_columns(func.count(Order.id)).order_by(None)
+    )
+    total = total_result.scalar_one() or 0
+    window = resolve_offset_pagination(total, pagination)
+
+    sort_expression, sort_field, is_desc = resolve_sort_expression(
+        sort,
+        allowed_columns={
+            "orderNumber": Order.order_number,
+            "status": Order.status,
+            "totalAmount": Order.total_amount,
+            "createdAt": Order.created_at,
+            "customer": Order.customer_name,
+        },
+        default_field="createdAt",
+        default_direction="desc",
+    )
+
+    tie_breaker = Order.id.desc() if is_desc else Order.id.asc()
+    order_by_expressions = [sort_expression]
+    if sort_field != "id":
+        order_by_expressions.append(tie_breaker)
+
+    query = (
+        _apply_order_filters(
+            select(Order).where(Order.store_id == ctx.store.id),
+            status=status,
+            created_from=created_from,
+            created_to=created_to,
+            q=q,
         )
+        .options(selectinload(Order.items).selectinload(OrderItem.options))
+        .order_by(*order_by_expressions)
+        .limit(window.page_size)
+        .offset(window.offset)
+    )
     result = await db.execute(query)
-    return result.scalars().unique().all()
+    return OrdersPageResponse(
+        items=result.scalars().unique().all(),
+        total=window.total,
+        page=window.page,
+        page_size=window.page_size,
+        page_count=window.page_count,
+    )
 
 
 @router.get("/orders/{order_id}", response_model=OrderResponse)

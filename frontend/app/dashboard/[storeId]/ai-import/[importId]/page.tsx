@@ -20,6 +20,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { denormalizeRequest } from "@/lib/normalize-response";
+import type { PaginatedResponse } from "@/lib/pagination";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -146,12 +147,15 @@ export default function ImportReviewPage({
         ]
     );
 
-    const { data: categories = [] } = useQuery({
+    const { data: categoriesPage } = useQuery({
         queryKey: ["menu-import-dialog-categories", storeId],
         queryFn: async () =>
-            fetchWithAccessToken<CategoryResponse[]>(`/stores/${storeId}/categories`),
+            fetchWithAccessToken<PaginatedResponse<CategoryResponse>>(
+                `/stores/${storeId}/categories?page=1&page_size=500`
+            ),
         enabled: !!storeId,
     });
+    const categories = categoriesPage?.items ?? [];
 
     const categoryOptions = useMemo<ProductCategoryOption[]>(
         () => categories.map((category) => ({ id: category.id, name: category.name })),

@@ -32,10 +32,23 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
+import { buildListQueryKey, useListFilters, type ListFilterConfig } from "@/lib/list-filters";
 import { denormalizeRequest } from "@/lib/normalize-response";
+import {
+    applyPaginationApiParams,
+    applyPaginationSearchParams,
+    applySortingSearchParam,
+    arePaginationParamsEqual,
+    areSortingParamsEqual,
+    DEFAULT_PAGE,
+    DEFAULT_PAGE_SIZE,
+    parsePaginationSearchParams,
+    parseSortingSearchParam,
+    type PaginatedResponse,
+} from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import {
     CalendarDays,
     Calendar as CalendarIcon,
@@ -47,8 +60,7 @@ import {
     Search,
     X
 } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 
@@ -117,6 +129,9 @@ type OrdersFilters = {
     to: string | null;
     statuses: OrderStatus[];
     q: string;
+    sorting: SortingState;
+    page: number;
+    pageSize: number;
 };
 
 type SearchParamsReader = {
@@ -145,12 +160,20 @@ const RANGE_OPTIONS: { value: RangePreset; label: string }[] = [
 ];
 
 const DEFAULT_RANGE: RangePreset = "today";
+const ORDER_SORTABLE_COLUMNS = ["orderNumber", "status", "totalAmount", "createdAt", "customer"] as const;
+const DEFAULT_ORDER_SORT = { id: "createdAt", desc: true } as const;
 
 function parseOrdersFilters(searchParams: SearchParamsReader): OrdersFilters {
     const rawRange = searchParams.get("range");
     const range = RANGE_OPTIONS.some((option) => option.value === rawRange)
         ? (rawRange as RangePreset)
         : DEFAULT_RANGE;
+    const pagination = parsePaginationSearchParams(searchParams);
+    const sorting = parseSortingSearchParam(
+        searchParams.get("sort"),
+        ORDER_SORTABLE_COLUMNS,
+        DEFAULT_ORDER_SORT
+    );
 
     const from = normalizeDateInput(searchParams.get("from"));
     const to = normalizeDateInput(searchParams.get("to"));
@@ -166,6 +189,9 @@ function parseOrdersFilters(searchParams: SearchParamsReader): OrdersFilters {
         to,
         statuses,
         q,
+        sorting,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
     };
 }
 
@@ -468,7 +494,10 @@ function useDebouncedValue<T>(value: T, delay: number) {
 
 function buildOrdersQueryParams(filters: OrdersFilters): URLSearchParams {
     const params = new URLSearchParams();
-    params.set("limit", "500");
+    applyPaginationApiParams(params, {
+        page: filters.page,
+        pageSize: filters.pageSize,
+    });
 
     const { start, endExclusive } = getDateRange(filters);
     if (start) {
@@ -484,6 +513,7 @@ function buildOrdersQueryParams(filters: OrdersFilters): URLSearchParams {
     if (filters.q.trim()) {
         params.set("q", filters.q.trim());
     }
+    applySortingSearchParam(params, filters.sorting, DEFAULT_ORDER_SORT);
     return params;
 }
 
@@ -510,6 +540,13 @@ function buildFiltersSearchParams(filters: OrdersFilters): URLSearchParams {
         params.set("q", filters.q);
     }
 
+    applySortingSearchParam(params, filters.sorting, DEFAULT_ORDER_SORT);
+
+    applyPaginationSearchParams(params, {
+        page: filters.page,
+        pageSize: filters.pageSize,
+    });
+
     return params;
 }
 
@@ -519,10 +556,43 @@ function areFiltersEqual(left: OrdersFilters, right: OrdersFilters) {
         left.from === right.from &&
         left.to === right.to &&
         left.q === right.q &&
+        areSortingParamsEqual(left.sorting, right.sorting) &&
+        arePaginationParamsEqual(left, right) &&
         left.statuses.length === right.statuses.length &&
         left.statuses.every((status, index) => status === right.statuses[index])
     );
 }
+
+const ordersFiltersConfig: ListFilterConfig<
+    OrdersFilters,
+    {
+        status: string;
+        range: RangePreset;
+        from: string | null;
+        to: string | null;
+        q: string;
+        sort: string | null;
+        page: number;
+        pageSize: number;
+    }
+> = {
+    parse: parseOrdersFilters,
+    serialize: buildFiltersSearchParams,
+    equals: areFiltersEqual,
+    toApiParams: buildOrdersQueryParams,
+    toQueryShape: (filters) => ({
+        status: filters.statuses.join(","),
+        range: filters.range,
+        from: filters.from,
+        to: filters.to,
+        q: filters.q,
+        sort: filters.sorting[0]
+            ? `${filters.sorting[0].id}:${filters.sorting[0].desc ? "desc" : "asc"}`
+            : null,
+        page: filters.page,
+        pageSize: filters.pageSize,
+    }),
+};
 
 function getOrdersTableColumns({
     onUpdateStatus,
@@ -534,16 +604,14 @@ function getOrdersTableColumns({
     return [
         {
             accessorKey: "orderNumber",
-            size: 96,
-            minSize: 88,
-            maxSize: 108,
+            size: 88,
+            minSize: 80,
+            maxSize: 100,
             header: ({ column }) => (
-                <DataTableColumnHeader column={column} title="Order" className="-ml-3" />
+                <DataTableColumnHeader column={column} title="Order" className="-ml-2" />
             ),
             cell: ({ row }) => (
-                <span
-                    className="h-auto px-0 py-0 font-semibold"
-                >
+                <span className="flex w-full ml-3">
                     #{row.original.orderNumber}
                 </span>
             ),
@@ -567,6 +635,7 @@ function getOrdersTableColumns({
         {
             id: "items",
             accessorFn: (order) => order.items.map((item) => item.productName).join(", "),
+            enableSorting: false,
             header: ({ column }) => (
                 <DataTableColumnHeader column={column} title="Items" className="-ml-3" />
             ),
@@ -839,19 +908,40 @@ function OrdersSubNav({
             <div className="flex items-center justify-between gap-4 w-full px-5 pt-3">
                 <div className="flex items-center shrink-0 gap-4">
                     <span className="text-base font-semibold">Orders Center</span>
-                    <Tabs
-                        value={activeStatusTab}
-                        onValueChange={(value) => onSetStatusTab(value as "all" | OrderStatus)}
-                    >
-                        <TabsList className="bg-background">
-                            <TabsTrigger value="all" className="h-8 px-2 text-xs">All</TabsTrigger>
-                            {STATUS_OPTIONS.map((status) => (
-                                <TabsTrigger key={status} value={status} className="h-8 px-2 text-xs">
-                                    {formatStatusLabel(status)}
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
-                    </Tabs>
+                    <div className="hidden xl:block">
+                        <Tabs
+                            value={activeStatusTab}
+                            onValueChange={(value) => onSetStatusTab(value as "all" | OrderStatus)}
+                        >
+                            <TabsList className="bg-background">
+                                <TabsTrigger value="all" className="h-8 px-2 text-xs">All</TabsTrigger>
+                                {STATUS_OPTIONS.map((status) => (
+                                    <TabsTrigger key={status} value={status} className="h-8 px-2 text-xs">
+                                        {formatStatusLabel(status)}
+                                    </TabsTrigger>
+                                ))}
+                            </TabsList>
+                        </Tabs>
+                    </div>
+
+                    <div className="xl:hidden">
+                        <Select
+                            value={activeStatusTab}
+                            onValueChange={(value) => onSetStatusTab(value as "all" | OrderStatus)}
+                        >
+                            <SelectTrigger className="h-8 w-44">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="end" position='popper'>
+                                <SelectItem value="all">All</SelectItem>
+                                {STATUS_OPTIONS.map((status) => (
+                                    <SelectItem key={status} value={status}>
+                                        {formatStatusLabel(status)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 <div>
@@ -873,7 +963,7 @@ function OrdersSubNav({
             </div>
 
             <div className="flex shrink-0 items-center justify-between gap-2 px-5 pt-3">
-                <InputGroup className="hidden h-8 w-72 lg:flex rounded-full">
+                <InputGroup className="h-8 w-72 flex rounded-full">
                     <InputGroupAddon align="inline-start">
                         <InputGroupText>
                             <Search className="size-4" />
@@ -952,12 +1042,7 @@ function OrdersSubNav({
 
 export function OrdersDashboard({ storeId }: { storeId: string }) {
     const queryClient = useQueryClient();
-    const searchParams = useSearchParams();
-    const router = useRouter();
-    const pathname = usePathname();
-
-    const urlFilters = useMemo(() => parseOrdersFilters(searchParams), [searchParams]);
-    const [filters, setFilters] = useState<OrdersFilters>(urlFilters);
+    const { filters, updateFilters, toApiParams, toQueryShape } = useListFilters(ordersFiltersConfig);
     const debouncedSearchQuery = useDebouncedValue(filters.q, 250);
     const queryFilters = useMemo(
         () => ({
@@ -970,10 +1055,6 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
-    useEffect(() => {
-        setFilters((current) => (areFiltersEqual(current, urlFilters) ? current : urlFilters));
-    }, [urlFilters]);
-
     const storeQuery = useQuery({
         queryKey: ["store", storeId],
         queryFn: async () => fetchWithAccessToken<StoreSummary>(`/stores/${storeId}`),
@@ -982,47 +1063,47 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
     });
 
     const ordersQuery = useQuery({
-        queryKey: [
-            "orders",
-            storeId,
-            {
-                status: deferredFilters.statuses.join(","),
-                range: deferredFilters.range,
-                from: deferredFilters.from,
-                to: deferredFilters.to,
-                q: deferredFilters.q,
-            },
-        ],
+        queryKey: buildListQueryKey("orders", storeId, toQueryShape(deferredFilters)),
         queryFn: async () => {
-            const params = buildOrdersQueryParams(deferredFilters);
-            return fetchWithAccessToken<Order[]>(`/stores/${storeId}/orders?${params}`);
+            const params = toApiParams(deferredFilters);
+            return fetchWithAccessToken<PaginatedResponse<Order>>(`/stores/${storeId}/orders?${params}`);
         },
         enabled: !!storeId,
         refetchInterval: 30_000,
         refetchIntervalInBackground: true,
-        placeholderData: (previousData) => previousData,
     });
 
-    function updateFilters(mutator: (current: OrdersFilters) => OrdersFilters) {
-        const nextFilters = mutator(filters);
-
-        if (areFiltersEqual(filters, nextFilters)) {
+    useEffect(() => {
+        if (!ordersQuery.data) {
             return;
         }
 
-        setFilters(nextFilters);
-
-        const nextQuery = buildFiltersSearchParams(nextFilters).toString();
-
-        startTransition(() => {
-            router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
-        });
-    }
+        if (
+            ordersQuery.data.page === filters.page &&
+            ordersQuery.data.pageSize === filters.pageSize
+        ) {
+            return;
+        }
+        updateFilters((current) => ({
+            ...current,
+            page: ordersQuery.data.page,
+            pageSize: ordersQuery.data.pageSize,
+        }));
+    }, [ordersQuery.data, updateFilters]);
 
     function setSearchQuery(value: string) {
         updateFilters((current) => ({
             ...current,
             q: value,
+            page: DEFAULT_PAGE,
+        }));
+    }
+
+    function setSorting(nextSorting: SortingState) {
+        updateFilters((current) => ({
+            ...current,
+            sorting: nextSorting.slice(0, 1),
+            page: DEFAULT_PAGE,
         }));
     }
 
@@ -1032,6 +1113,7 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
             range,
             from: range === "custom" ? current.from : null,
             to: range === "custom" ? current.to : null,
+            page: DEFAULT_PAGE,
         }));
     }
 
@@ -1041,6 +1123,7 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
             range: "custom",
             from,
             to,
+            page: DEFAULT_PAGE,
         }));
     }
 
@@ -1048,6 +1131,15 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
         updateFilters((current) => ({
             ...current,
             statuses: status === "all" ? [] : [status],
+            page: DEFAULT_PAGE,
+        }));
+    }
+
+    function setPagination(nextPage: number, nextPageSize: number) {
+        updateFilters((current) => ({
+            ...current,
+            page: nextPage,
+            pageSize: nextPageSize,
         }));
     }
 
@@ -1058,10 +1150,15 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
             to: null,
             statuses: [],
             q: "",
+            sorting: [DEFAULT_ORDER_SORT],
+            page: DEFAULT_PAGE,
+            pageSize: DEFAULT_PAGE_SIZE,
         }));
     }
 
-    const allOrders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
+    const allOrders = useMemo(() => ordersQuery.data?.items ?? [], [ordersQuery.data]);
+    const totalOrders = ordersQuery.data?.total ?? 0;
+    const pageCount = ordersQuery.data?.pageCount ?? 1;
     const selectedOrder = useMemo(
         () => allOrders.find((order) => order.id === selectedOrderId) ?? null,
         [allOrders, selectedOrderId]
@@ -1081,23 +1178,34 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
             setUpdatingOrderId(orderId);
             await queryClient.cancelQueries({ queryKey: ["orders", storeId] });
 
-            const previousOrders = queryClient.getQueryData<Order[]>(["orders", storeId]) ?? [];
-            queryClient.setQueryData<Order[]>(["orders", storeId], (current = []) =>
-                current.map((order) =>
-                    order.id === orderId
-                        ? {
-                            ...order,
-                            status: newStatus,
-                        }
-                        : order
-                )
-            );
+            const previousOrders = queryClient.getQueriesData<PaginatedResponse<Order>>({
+                queryKey: ["orders", storeId],
+            });
+            queryClient.setQueriesData<PaginatedResponse<Order>>({ queryKey: ["orders", storeId] }, (current) => {
+                if (!current) {
+                    return current;
+                }
+
+                return {
+                    ...current,
+                    items: current.items.map((order) =>
+                        order.id === orderId
+                            ? {
+                                ...order,
+                                status: newStatus,
+                            }
+                            : order
+                    ),
+                };
+            });
 
             return { previousOrders };
         },
         onError: (error, _variables, context) => {
             if (context?.previousOrders) {
-                queryClient.setQueryData(["orders", storeId], context.previousOrders);
+                for (const [queryKey, data] of context.previousOrders) {
+                    queryClient.setQueryData(queryKey, data);
+                }
             }
             toast.error(error instanceof Error ? error.message : "Failed to update order status");
         },
@@ -1142,7 +1250,7 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
             />
 
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-                <div className="flex min-h-full flex-1 flex-col gap-4 px-4">
+                <div className="flex min-h-full flex-1 flex-col gap-4 px-5">
                     <div className="min-h-96 flex-1 overflow-hidden">
                         <DataTable
                             columns={columns}
@@ -1152,7 +1260,20 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
                             enableDefaultActionBar={false}
                             showDefaultSearch={false}
                             showViewOptions={false}
-                            defaultPageSize={20}
+                            sorting={filters.sorting}
+                            onSortingChange={setSorting}
+                            manualSorting
+                            pagination={{
+                                pageIndex: Math.max(filters.page - 1, 0),
+                                pageSize: filters.pageSize,
+                            }}
+                            onPaginationChange={({ pageIndex, pageSize }) => {
+                                const pageSizeChanged = pageSize !== filters.pageSize;
+                                setPagination(pageSizeChanged ? DEFAULT_PAGE : pageIndex + 1, pageSize);
+                            }}
+                            manualPagination
+                            pageCount={pageCount}
+                            totalCount={totalOrders}
                             getRowId={(order) => order.id}
                             emptyTitle={hasNonDefaultFilters ? "No orders match this view" : "No orders yet"}
                             emptyDescription={

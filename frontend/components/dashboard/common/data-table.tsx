@@ -4,12 +4,15 @@ import {
     type ColumnDef,
     type ColumnFiltersState,
     flexRender,
+    functionalUpdate,
     getCoreRowModel,
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
+    type PaginationState,
     type RowSelectionState,
     type SortingState,
+    type Updater,
     useReactTable,
     type VisibilityState,
 } from "@tanstack/react-table";
@@ -72,6 +75,16 @@ type DataTableProps<TData, TValue> = {
     }) => void;
     onRowClick?: (row: TData) => void;
     rowSelectionDisabled?: boolean;
+    sorting?: SortingState;
+    onSortingChange?: (sorting: SortingState) => void;
+    manualSorting?: boolean;
+    searchValue?: string;
+    onSearchValueChange?: (value: string) => void;
+    pagination?: PaginationState;
+    onPaginationChange?: (pagination: PaginationState) => void;
+    pageCount?: number;
+    totalCount?: number;
+    manualPagination?: boolean;
 };
 
 function formatColumnLabel(columnId: string) {
@@ -104,11 +117,47 @@ export function DataTable<TData, TValue>({
     onSelectionChange,
     onRowClick,
     rowSelectionDisabled = false,
+    sorting: controlledSorting,
+    onSortingChange,
+    manualSorting = false,
+    searchValue,
+    onSearchValueChange,
+    pagination: controlledPagination,
+    onPaginationChange,
+    pageCount,
+    totalCount,
+    manualPagination = false,
 }: DataTableProps<TData, TValue>) {
-    const [sorting, setSorting] = useState<SortingState>([]);
+    const [uncontrolledSorting, setUncontrolledSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const [uncontrolledPagination, setUncontrolledPagination] = useState<PaginationState>({
+        pageIndex: 0,
+        pageSize: defaultPageSize,
+    });
+    const sorting = controlledSorting ?? uncontrolledSorting;
+    const pagination = controlledPagination ?? uncontrolledPagination;
+
+    function handleSortingChange(updater: Updater<SortingState>) {
+        const nextSorting = functionalUpdate(updater, sorting);
+
+        if (!controlledSorting) {
+            setUncontrolledSorting(nextSorting);
+        }
+
+        onSortingChange?.(nextSorting);
+    }
+
+    function handlePaginationChange(updater: Updater<PaginationState>) {
+        const nextPagination = functionalUpdate(updater, pagination);
+
+        if (!controlledPagination) {
+            setUncontrolledPagination(nextPagination);
+        }
+
+        onPaginationChange?.(nextPagination);
+    }
 
     const selectionColumn = useMemo<ColumnDef<TData, TValue>[]>(
         () =>
@@ -149,25 +198,25 @@ export function DataTable<TData, TValue>({
         data,
         columns: tableColumns,
         getRowId,
-        onSortingChange: setSorting,
+        onSortingChange: handleSortingChange,
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
         onRowSelectionChange: setRowSelection,
+        onPaginationChange: handlePaginationChange,
         enableRowSelection,
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getCoreRowModel: getCoreRowModel(),
+        manualSorting,
+        manualPagination,
+        pageCount,
         state: {
             sorting,
             columnFilters,
             columnVisibility,
             rowSelection,
-        },
-        initialState: {
-            pagination: {
-                pageSize: defaultPageSize,
-            },
+            pagination,
         },
     });
 
@@ -175,9 +224,11 @@ export function DataTable<TData, TValue>({
         () => (searchColumnId ? table.getColumn(searchColumnId) : undefined),
         [searchColumnId, table]
     );
+    const shouldRenderSearch = showDefaultSearch && (!!searchableColumn || !!onSearchValueChange);
 
     const selectedRows = table.getSelectedRowModel().rows.map((row) => row.original);
     const selectedCount = selectedRows.length;
+    const totalItems = totalCount ?? table.getFilteredRowModel().rows.length;
 
     useEffect(() => {
         onSelectionChange?.({
@@ -191,11 +242,18 @@ export function DataTable<TData, TValue>({
     return (
         <div className="pt-3 h-full min-h-0 min-w-0 w-full overflow-hidden flex flex-col">
             {enableDefaultActionBar && (showViewOptions || showDefaultSearch) ? <div className="shrink-0 mb-3 bg-background-elevated z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                {searchableColumn && showDefaultSearch ? (
+                {shouldRenderSearch ? (
                     <Input
                         placeholder={searchPlaceholder}
-                        value={(searchableColumn.getFilterValue() as string) ?? ""}
-                        onChange={(event) => searchableColumn.setFilterValue(event.target.value)}
+                        value={onSearchValueChange ? (searchValue ?? "") : (searchableColumn?.getFilterValue() as string) ?? ""}
+                        onChange={(event) => {
+                            if (onSearchValueChange) {
+                                onSearchValueChange(event.target.value);
+                                return;
+                            }
+
+                            searchableColumn?.setFilterValue(event.target.value);
+                        }}
                         className="w-full sm:max-w-xs"
                     />
                 ) : <div className="flex-1" />}
@@ -298,7 +356,7 @@ export function DataTable<TData, TValue>({
             <div className={`shrink-0 bg-background-elevated flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between ${size === "sm" ? "text-xs" : size === "md" ? "text-sm" : "text-lg"}`}>
 
                 <div className="text-muted-foreground">
-                    {table.getSelectedRowModel().rows.length} of {table.getFilteredRowModel().rows.length} item(s) selected
+                    {table.getSelectedRowModel().rows.length} of {totalItems} item(s) selected
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-4 sm:gap-6 md:gap-8 lg:gap-10">
 

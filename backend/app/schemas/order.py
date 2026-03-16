@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from pydantic import BaseModel, Field
 from app.models.order import OrderStatus
+from app.schemas.pagination import PaginationMetadata
 
 
 class OrderItemOptionCreate(BaseModel):
@@ -70,6 +71,10 @@ class OrderResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class OrdersPageResponse(PaginationMetadata):
+    items: list[OrderResponse]
 
 
 class OrderStatusUpdate(BaseModel):

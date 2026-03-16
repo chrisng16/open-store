@@ -13,11 +13,125 @@ import {
 import { DataTable } from "@/components/dashboard/common/data-table";
 import { Button } from "@/components/ui/button";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
+import { buildListQueryKey, type ListFilterConfig, useListFilters } from "@/lib/list-filters";
+import {
+    applyPaginationApiParams,
+    applyPaginationSearchParams,
+    applySortingSearchParam,
+    arePaginationParamsEqual,
+    areSortingParamsEqual,
+    DEFAULT_PAGE,
+    type PaginatedResponse,
+    parsePaginationSearchParams,
+    parseSortingSearchParam,
+} from "@/lib/pagination";
 import { useCategoryDialogActions } from "@/stores/ui-store";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { SortingState } from "@tanstack/react-table";
 import { Plus, Trash2 } from "lucide-react";
 import { use, useMemo, useState } from "react";
 import { toast } from "sonner";
+
+type CategoryFilters = {
+    q: string;
+    sorting: SortingState;
+    page: number;
+    pageSize: number;
+    statusFilter: "all" | "active" | "hidden";
+};
+
+const CATEGORY_SORTABLE_COLUMNS = ["name", "description", "isActive"] as const;
+const DEFAULT_CATEGORY_SORT = { id: "name", desc: false } as const;
+
+function parseCategoryFilters(searchParams: URLSearchParams): CategoryFilters {
+    const pagination = parsePaginationSearchParams(searchParams);
+    const sorting = parseSortingSearchParam(
+        searchParams.get("sort"),
+        CATEGORY_SORTABLE_COLUMNS,
+        DEFAULT_CATEGORY_SORT
+    );
+    const rawStatus = searchParams.get("status");
+    const statusFilter =
+        rawStatus === "all" || rawStatus === "active" || rawStatus === "hidden"
+            ? rawStatus
+            : "all";
+
+    return {
+        q: (searchParams.get("q") ?? "").trim(),
+        sorting,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        statusFilter,
+    };
+}
+
+function buildCategorySearchParams(filters: CategoryFilters): URLSearchParams {
+    const params = new URLSearchParams();
+
+    if (filters.q) {
+        params.set("q", filters.q);
+    }
+    if (filters.statusFilter !== "all") {
+        params.set("status", filters.statusFilter);
+    }
+    applySortingSearchParam(params, filters.sorting, DEFAULT_CATEGORY_SORT);
+    applyPaginationSearchParams(params, {
+        page: filters.page,
+        pageSize: filters.pageSize,
+    });
+
+    return params;
+}
+
+function buildCategoryApiParams(filters: CategoryFilters): URLSearchParams {
+    const params = new URLSearchParams();
+
+    applyPaginationApiParams(params, {
+        page: filters.page,
+        pageSize: filters.pageSize,
+    });
+    if (filters.q) {
+        params.set("q", filters.q);
+    }
+    params.set("status_filter", filters.statusFilter);
+    applySortingSearchParam(params, filters.sorting, DEFAULT_CATEGORY_SORT);
+
+    return params;
+}
+
+function areCategoryFiltersEqual(left: CategoryFilters, right: CategoryFilters) {
+    return (
+        left.q === right.q &&
+        left.statusFilter === right.statusFilter &&
+        arePaginationParamsEqual(left, right) &&
+        areSortingParamsEqual(left.sorting, right.sorting)
+    );
+}
+
+const categoryFiltersConfig: ListFilterConfig<
+    CategoryFilters,
+    {
+        q: string;
+        statusFilter: CategoryFilters["statusFilter"];
+        sort: string | null;
+        page: number;
+        pageSize: number;
+    }
+> = {
+    parse: parseCategoryFilters,
+    serialize: buildCategorySearchParams,
+    equals: areCategoryFiltersEqual,
+    toApiParams: buildCategoryApiParams,
+    toQueryShape: (filters) => ({
+        q: filters.q,
+        statusFilter: filters.statusFilter,
+        sort: filters.sorting[0]
+            ? `${filters.sorting[0].id}:${filters.sorting[0].desc ? "desc" : "asc"}`
+            : null,
+        page: filters.page,
+        pageSize: filters.pageSize,
+    }),
+};
 
 export default function CategoriesPage({
     params,
@@ -30,18 +144,20 @@ export default function CategoriesPage({
     const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
     const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
     const { openCategoryCreate, openCategoryEdit } = useCategoryDialogActions();
+    const { filters, updateFilters, toApiParams, toQueryShape } = useListFilters(categoryFiltersConfig);
 
     const { data, isPending, refetch } = useQuery({
-        queryKey: ["store-categories", storeId],
+        queryKey: buildListQueryKey("store-categories", storeId, toQueryShape(filters)),
         queryFn: async () =>
-            fetchWithAccessToken<CategoryRow[]>(`/stores/${storeId}/categories`),
+            fetchWithAccessToken<PaginatedResponse<CategoryRow>>(
+                `/stores/${storeId}/categories?${toApiParams(filters)}`
+            ),
         enabled: !!storeId,
     });
 
-    const categories = useMemo(
-        () => [...(data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
-        [data]
-    );
+    const categories = data?.items ?? [];
+    const pageCount = data?.pageCount ?? 1;
+    const totalCategories = data?.total ?? 0;
 
     const deleteMutation = useMutation({
         mutationFn: async (categoryId: string) => {
@@ -123,6 +239,7 @@ export default function CategoriesPage({
                     isLoading={isPending}
                     enableRowSelection
                     getRowId={(row) => row.id}
+                    onRowClick={openEditDialog}
                     renderBulkActions={({ selectedRows }) => (
                         <Button
                             variant={selectedRows.length > 0 ? "destructive" : "outline"}
@@ -140,6 +257,30 @@ export default function CategoriesPage({
                     )}
                     loadingText="Loading categories..."
                     searchColumnId="name"
+                    searchValue={filters.q}
+                    onSearchValueChange={(value) =>
+                        updateFilters((current) => ({ ...current, q: value, page: DEFAULT_PAGE }))
+                    }
+                    sorting={filters.sorting}
+                    onSortingChange={(sorting) =>
+                        updateFilters((current) => ({ ...current, sorting: sorting.slice(0, 1), page: DEFAULT_PAGE }))
+                    }
+                    manualSorting
+                    pagination={{
+                        pageIndex: Math.max(filters.page - 1, 0),
+                        pageSize: filters.pageSize,
+                    }}
+                    onPaginationChange={({ pageIndex, pageSize }) => {
+                        const pageSizeChanged = pageSize !== filters.pageSize;
+                        updateFilters((current) => ({
+                            ...current,
+                            page: pageSizeChanged ? DEFAULT_PAGE : pageIndex + 1,
+                            pageSize,
+                        }));
+                    }}
+                    manualPagination
+                    pageCount={pageCount}
+                    totalCount={totalCategories}
                     searchPlaceholder="Search categories by name..."
                     emptyTitle="No categories yet"
                     emptyDescription="Create your first category to organize products."

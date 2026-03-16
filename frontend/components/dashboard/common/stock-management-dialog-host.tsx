@@ -4,6 +4,7 @@ import { CategoryEditorDialog } from "@/components/dashboard/common/category-edi
 import { ProductEditorDialog, type ProductCategoryOption } from "@/components/dashboard/products/product-editor-dialog";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { denormalizeRequest } from "@/lib/normalize-response";
+import type { PaginatedResponse } from "@/lib/pagination";
 import { uploadFileWithSignedUrl } from "@/lib/uploads";
 import {
     emptyCategoryFormData,
@@ -37,12 +38,15 @@ export function StockManagementDialogHost() {
         setProductFormData,
     } = useStockManagementDialogState();
 
-    const { data: categories = [] } = useQuery({
+    const { data: categoriesPage } = useQuery({
         queryKey: ["dialog-categories", storeId],
         queryFn: async () =>
-            fetchWithAccessToken<CategoryResponse[]>(`/stores/${storeId}/categories`),
+            fetchWithAccessToken<PaginatedResponse<CategoryResponse>>(
+                `/stores/${storeId}/categories?page=1&page_size=500`
+            ),
         enabled: !!storeId,
     });
+    const categories = categoriesPage?.items ?? [];
 
     const categoryOptions: ProductCategoryOption[] = categories.map((category) => ({
         id: category.id,

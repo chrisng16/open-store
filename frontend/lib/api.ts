@@ -75,7 +75,7 @@ export const api = {
 
     categories: {
         list: (storeId: string) =>
-            request(`/stores/${storeId}/categories`),
+            request<{ items: unknown[] }>(`/stores/${storeId}/categories?page=1&page_size=500`).then((response) => response.items),
         create: (storeId: string, data: unknown, token: string) =>
             request(`/stores/${storeId}/categories`, { method: "POST", body: data, token }),
         update: (storeId: string, categoryId: string, data: unknown, token: string) =>
@@ -86,7 +86,7 @@ export const api = {
 
     products: {
         list: (storeId: string, categoryId?: string) =>
-            request(`/stores/${storeId}/products${categoryId ? `?category_id=${categoryId}` : ""}`),
+            request<{ items: unknown[] }>(`/stores/${storeId}/products?page=1&page_size=500${categoryId ? `&category_id=${categoryId}` : ""}`).then((response) => response.items),
         get: (storeId: string, productId: string) =>
             request(`/stores/${storeId}/products/${productId}`),
         create: (storeId: string, data: unknown, token: string) =>
@@ -101,7 +101,7 @@ export const api = {
         create: (storeId: string, data: unknown) =>
             request(`/stores/${storeId}/orders`, { method: "POST", body: data }),
         list: (storeId: string, token: string, statusFilter?: string) =>
-            request(`/stores/${storeId}/orders${statusFilter ? `?status_filter=${statusFilter}` : ""}`, { token }),
+            request<{ items: unknown[] }>(`/stores/${storeId}/orders?page=1&page_size=500${statusFilter ? `&status=${statusFilter}` : ""}`, { token }).then((response) => response.items),
         get: (storeId: string, orderId: string) =>
             request(`/stores/${storeId}/orders/${orderId}`),
         updateStatus: (storeId: string, orderId: string, status: string, token: string) =>

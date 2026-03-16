@@ -1,9 +1,11 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.pagination import get_offset_pagination, OffsetPaginationParams, resolve_offset_pagination
+from app.api.sorting import resolve_sort_expression
 from app.database import get_db
 from app.api.deps import get_store_context, require_role, StoreContext
 from app.models.store import MemberRole
@@ -12,7 +14,9 @@ from app.schemas.product import (
     CategoryCreate,
     CategoryUpdate,
     CategoryResponse,
+    CategoriesPageResponse,
     ProductListItemResponse,
+    ProductsPageResponse,
     ProductCreate,
     ProductUpdate,
     ProductResponse,
@@ -24,17 +28,65 @@ router = APIRouter(prefix="/stores/{store_id}", tags=["products"])
 # --- Categories ---
 
 
-@router.get("/categories", response_model=list[CategoryResponse])
+@router.get("/categories", response_model=CategoriesPageResponse)
 async def list_categories(
     store_id: uuid.UUID,
+    status_filter: str = "all",
+    q: str | None = None,
+    sort: str | None = None,
+    pagination: OffsetPaginationParams = Depends(get_offset_pagination),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Category)
-        .where(Category.store_id == store_id)
-        .order_by(Category.sort_order)
+    filtered_query = select(Category).where(Category.store_id == store_id)
+
+    if status_filter == "active":
+        filtered_query = filtered_query.where(Category.is_active.is_(True))
+    elif status_filter == "hidden":
+        filtered_query = filtered_query.where(Category.is_active.is_(False))
+
+    if q:
+        term = f"%{q.strip()}%"
+        filtered_query = filtered_query.where(
+            or_(
+                Category.name.ilike(term),
+                Category.description.ilike(term),
+            )
+        )
+
+    total_result = await db.execute(
+        filtered_query.with_only_columns(func.count(Category.id)).order_by(None)
     )
-    return result.scalars().all()
+    total = total_result.scalar_one() or 0
+    window = resolve_offset_pagination(total, pagination)
+
+    sort_expression, _, is_desc = resolve_sort_expression(
+        sort,
+        allowed_columns={
+            "name": Category.name,
+            "description": Category.description,
+            "isActive": Category.is_active,
+            "sortOrder": Category.sort_order,
+            "createdAt": Category.created_at,
+            "updatedAt": Category.updated_at,
+        },
+        default_field="name",
+        default_direction="asc",
+    )
+    tie_breaker = Category.id.desc() if is_desc else Category.id.asc()
+
+    result = await db.execute(
+        filtered_query
+        .order_by(sort_expression, tie_breaker)
+        .limit(window.page_size)
+        .offset(window.offset)
+    )
+    return CategoriesPageResponse(
+        items=result.scalars().all(),
+        total=window.total,
+        page=window.page,
+        page_size=window.page_size,
+        page_count=window.page_count,
+    )
 
 
 @router.post("/categories", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
@@ -88,21 +140,70 @@ async def delete_category(
 # --- Products ---
 
 
-@router.get("/products", response_model=list[ProductListItemResponse])
+@router.get("/products", response_model=ProductsPageResponse)
 async def list_products(
     store_id: uuid.UUID,
     category_id: uuid.UUID | None = None,
+    status_filter: str = "active",
+    q: str | None = None,
+    sort: str | None = None,
+    pagination: OffsetPaginationParams = Depends(get_offset_pagination),
     db: AsyncSession = Depends(get_db),
 ):
-    query = (
-        select(Product)
-        .where(Product.store_id == store_id, Product.is_active == True)
-        .order_by(Product.sort_order)
-    )
+    filtered_query = select(Product).where(Product.store_id == store_id)
+
+    if status_filter == "active":
+        filtered_query = filtered_query.where(Product.is_active.is_(True))
+    elif status_filter == "hidden":
+        filtered_query = filtered_query.where(Product.is_active.is_(False))
+
     if category_id:
-        query = query.where(Product.category_id == category_id)
-    result = await db.execute(query)
-    return result.scalars().unique().all()
+        filtered_query = filtered_query.where(Product.category_id == category_id)
+
+    if q:
+        term = f"%{q.strip()}%"
+        filtered_query = filtered_query.where(
+            or_(
+                Product.name.ilike(term),
+                Product.description.ilike(term),
+                Product.ingredients.ilike(term),
+            )
+        )
+
+    total_result = await db.execute(
+        filtered_query.with_only_columns(func.count(Product.id)).order_by(None)
+    )
+    total = total_result.scalar_one() or 0
+    window = resolve_offset_pagination(total, pagination)
+
+    sort_expression, _, is_desc = resolve_sort_expression(
+        sort,
+        allowed_columns={
+            "name": Product.name,
+            "unitAmount": Product.unit_amount,
+            "isActive": Product.is_active,
+            "sortOrder": Product.sort_order,
+            "createdAt": Product.created_at,
+            "updatedAt": Product.updated_at,
+        },
+        default_field="name",
+        default_direction="asc",
+    )
+    tie_breaker = Product.id.desc() if is_desc else Product.id.asc()
+
+    result = await db.execute(
+        filtered_query
+        .order_by(sort_expression, tie_breaker)
+        .limit(window.page_size)
+        .offset(window.offset)
+    )
+    return ProductsPageResponse(
+        items=result.scalars().unique().all(),
+        total=window.total,
+        page=window.page,
+        page_size=window.page_size,
+        page_count=window.page_count,
+    )
 
 
 @router.get("/products/{product_id}", response_model=ProductResponse)
