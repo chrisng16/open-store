@@ -27,7 +27,7 @@ async def get_store_onboarding_status(
     )
     has_published_import = int(published_import_result.scalar() or 0) > 0
 
-    details_complete = bool(store.address and store.phone and store.timezone and store.business_hours)
+    details_complete = True
     stripe_complete = bool(store.stripe_onboarding_complete)
     menu_complete = active_product_count > 0 or has_published_import
 
@@ -36,9 +36,8 @@ async def get_store_onboarding_status(
             id="store_details",
             title="Store details",
             completed=details_complete,
-            blocking_reasons=[]
-            if details_complete
-            else ["Provide address, phone, timezone, and business hours."],
+            required=False,
+            blocking_reasons=[],
         ),
         OnboardingStepStatus(
             id="stripe_connect",

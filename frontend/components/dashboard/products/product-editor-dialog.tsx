@@ -86,7 +86,7 @@ export function ProductEditorDialog({
 
         setFormData(initialFormData);
         setIsDirty(false);
-    }, [initialFormData.id, open]);
+    }, [activeProductId, open]);
 
     useEffect(() => {
         if (!open) return;

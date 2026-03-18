@@ -1,11 +1,12 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.api.deps import get_current_user, get_store_context, require_role, CurrentUser, StoreContext
+from app.api.deps import require_role, StoreContext
 from app.models.store import Store, MemberRole
+from app.models.order import Order, OrderStatus
 from app.config import get_settings
 from app.schemas.payment import CreatePaymentIntentRequest
 from app.services.stripe_service import (
@@ -87,8 +88,19 @@ async def create_intent(
     payload: CreatePaymentIntentRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Store).where(Store.id == payload.store_id))
-    store = result.scalar_one_or_none()
+    order_result = await db.execute(select(Order).where(Order.id == payload.order_id))
+    order = order_result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.status != OrderStatus.pending:
+        raise HTTPException(status_code=400, detail="Only pending orders can create a payment intent")
+
+    if order.stripe_payment_intent_id:
+        raise HTTPException(status_code=409, detail="Payment intent already created for this order")
+
+    store_result = await db.execute(select(Store).where(Store.id == order.store_id))
+    store = store_result.scalar_one_or_none()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
 
@@ -107,14 +119,22 @@ async def create_intent(
         raise HTTPException(status_code=400, detail="Store transfer capability is not active")
 
     settings = get_settings()
-    fee = int(payload.amount * settings.stripe_platform_fee_percent / 100)
+    fee = int(order.total_amount * settings.stripe_platform_fee_percent / 100)
 
     intent = await create_payment_intent(
-        amount=payload.amount,
+        amount=order.total_amount,
         currency="usd",
         destination_account=store.stripe_account_id,
         application_fee=fee,
+        metadata={
+            "order_id": str(order.id),
+            "store_id": str(store.id),
+        },
     )
+
+    order.stripe_payment_intent_id = intent.id
+    await db.flush()
+
     return {"client_secret": intent.client_secret, "payment_intent_id": intent.id}
 
 
@@ -139,14 +159,11 @@ async def stripe_webhook(
 
     if event["type"] == "payment_intent.succeeded":
         pi = event["data"]["object"]
-        # Update order status
-        from app.models.order import Order, OrderStatus
-
         result = await db.execute(
             select(Order).where(Order.stripe_payment_intent_id == pi["id"])
         )
         order = result.scalar_one_or_none()
-        if order:
+        if order and order.status == OrderStatus.pending:
             order.status = OrderStatus.confirmed
             await db.flush()
 

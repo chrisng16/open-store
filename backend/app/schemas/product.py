@@ -163,9 +163,20 @@ class ProductListItemResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ProductListItemCategoryResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
+class ProductWithCategoryListItemResponse(ProductListItemResponse):
+    category: ProductListItemCategoryResponse | None = None
+
+
 class CategoriesPageResponse(PaginationMetadata):
     items: list[CategoryResponse]
 
 
 class ProductsPageResponse(PaginationMetadata):
-    items: list[ProductListItemResponse]
+    items: list[ProductWithCategoryListItemResponse]

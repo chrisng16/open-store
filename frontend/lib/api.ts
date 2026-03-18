@@ -100,6 +100,8 @@ export const api = {
     orders: {
         create: (storeId: string, data: unknown) =>
             request(`/stores/${storeId}/orders`, { method: "POST", body: data }),
+        lookup: (storeId: string, data: { order_number: string; email?: string; phone?: string }) =>
+            request<{ order_id: string; order_access_token: string }>(`/stores/${storeId}/orders/lookup`, { method: "POST", body: data }),
         list: (storeId: string, token: string, statusFilter?: string) =>
             request<{ items: unknown[] }>(`/stores/${storeId}/orders?page=1&page_size=500${statusFilter ? `&status=${statusFilter}` : ""}`, { token }).then((response) => response.items),
         get: (storeId: string, orderId: string) =>
@@ -127,8 +129,8 @@ export const api = {
     },
 
     payments: {
-        createIntent: (storeId: string, amount: number) =>
-            request("/payments/create-intent", { method: "POST", body: { store_id: storeId, amount } }),
+        createIntent: (orderId: string) =>
+            request("/payments/create-intent", { method: "POST", body: { order_id: orderId } }),
     },
 
     stripe: {

@@ -5,7 +5,6 @@ import { DataTable } from "@/components/dashboard/common/data-table";
 import { ProductDeleteDialog } from "@/components/dashboard/common/product-delete-dialog";
 import {
     getProductsTableColumns,
-    type ProductCategoryOption,
     type ProductRow,
 } from "@/components/dashboard/common/products-table-columns";
 import { Button } from "@/components/ui/button";
@@ -29,13 +28,6 @@ import { Trash2 } from "lucide-react";
 import { use, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-type Category = {
-    id: string;
-    name: string;
-    description: string | null;
-    sortOrder: number;
-};
-
 type ProductFilters = {
     q: string;
     sorting: SortingState;
@@ -44,7 +36,7 @@ type ProductFilters = {
     statusFilter: "all" | "active" | "hidden";
 };
 
-const PRODUCT_SORTABLE_COLUMNS = ["name", "unitAmount", "isActive"] as const;
+const PRODUCT_SORTABLE_COLUMNS = ["name", "category", "unitAmount", "isActive"] as const;
 const DEFAULT_PRODUCT_SORT = { id: "name", desc: false } as const;
 
 function parseProductsFilters(searchParams: URLSearchParams): ProductFilters {
@@ -157,24 +149,17 @@ export default function MenuEditorPage({
         queryKey: buildListQueryKey("menu-editor", storeId, toQueryShape(filters)),
         queryFn: async () => {
             const apiParams = toApiParams(filters);
-            const [categories, productsPage] = await Promise.all([
-                fetchWithAccessToken<PaginatedResponse<Category>>(`/stores/${storeId}/categories?page=1&page_size=500`),
-                fetchWithAccessToken<PaginatedResponse<ProductRow>>(`/stores/${storeId}/products?${apiParams}`),
-            ]);
-            return { categories: categories.items, productsPage };
+            const productsPage = await fetchWithAccessToken<PaginatedResponse<ProductRow>>(
+                `/stores/${storeId}/products?${apiParams}`
+            );
+            return { productsPage };
         },
         enabled: !!storeId,
     });
 
-    const categories = data?.categories ?? [];
     const products = data?.productsPage.items ?? [];
     const pageCount = data?.productsPage.pageCount ?? 1;
     const totalProducts = data?.productsPage.total ?? 0;
-
-    const categoryOptions = useMemo<ProductCategoryOption[]>(
-        () => categories.map((category) => ({ id: category.id, name: category.name })),
-        [categories]
-    );
 
     const deleteProductMutation = useMutation({
         mutationFn: async (productId: string) => {
@@ -240,10 +225,8 @@ export default function MenuEditorPage({
     const columns = useMemo(
         () =>
             getProductsTableColumns({
-                categories: categoryOptions,
                 onEdit: (product) => {
-                    const initialCategoryName =
-                        categoryOptions.find((category) => category.id === product.categoryId)?.name ?? "";
+                    const initialCategoryName = product.category?.name ?? "";
 
                     queryClient.setQueryData(
                         ["dialog-product-detail", storeId, product.id],
@@ -256,7 +239,7 @@ export default function MenuEditorPage({
                     setProductToDelete(product);
                 },
             }),
-        [categoryOptions, openProductEdit, queryClient, storeId]
+        [openProductEdit, queryClient, storeId]
     );
 
     async function handleDeleteProduct() {
@@ -274,8 +257,7 @@ export default function MenuEditorPage({
                     enableRowSelection
                     getRowId={(row) => row.id}
                     onRowClick={(product) => {
-                        const initialCategoryName =
-                            categoryOptions.find((category) => category.id === product.categoryId)?.name ?? "";
+                        const initialCategoryName = product.category?.name ?? "";
 
                         queryClient.setQueryData(
                             ["dialog-product-detail", storeId, product.id],

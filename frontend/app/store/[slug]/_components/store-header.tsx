@@ -43,6 +43,11 @@ export default function StoreHeader({ store, slug }: { store: StoreData; slug: s
                                     Checkout
                                 </Button>
                             </Link>
+                            <Link href={`/store/${slug}/orders`}>
+                                <Button variant="outline" size="sm" className="rounded-full border border-transparent px-4 hover:border-border/80 hover:bg-card">
+                                    Track order
+                                </Button>
+                            </Link>
                         </nav>
 
                         <div className="flex flex-wrap items-center gap-2">

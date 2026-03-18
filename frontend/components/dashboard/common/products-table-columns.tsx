@@ -19,6 +19,7 @@ export type ProductRow = {
     unitAmount: number;
     imageUrl?: string | null;
     categoryId: string | null;
+    category?: ProductCategoryOption | null;
     isActive: boolean;
     dietaryTags: string[] | null;
     optionLists?: {
@@ -37,13 +38,11 @@ export type ProductRow = {
 };
 
 type ProductsColumnsParams = {
-    categories: ProductCategoryOption[];
     onEdit: (product: ProductRow) => void;
     onDelete: (product: ProductRow) => void;
 };
 
 export function getProductsTableColumns({
-    categories,
     onEdit,
     onDelete,
 }: ProductsColumnsParams): ColumnDef<ProductRow>[] {
@@ -63,18 +62,11 @@ export function getProductsTableColumns({
         },
         {
             id: "category",
-            accessorFn: (row) => {
-                const category = categories.find((item) => item.id === row.categoryId);
-                return category?.name ?? "";
-            },
-            enableSorting: false,
+            accessorFn: (row) => row.category?.name ?? "",
             header: ({ column }) => (
                 <DataTableColumnHeader column={column} title="Category" className="-ml-3" />
             ),
-            cell: ({ row }) => {
-                const category = categories.find((item) => item.id === row.original.categoryId);
-                return category?.name ?? "—";
-            },
+            cell: ({ row }) => row.original.category?.name ?? "—",
         },
         {
             accessorKey: "unitAmount",

@@ -131,6 +131,9 @@ export default function StoreFooter() {
                             <Link className="rounded-full px-3 py-2 transition-colors hover:bg-card" href={`/store/${store.slug}/checkout`}>
                                 Checkout
                             </Link>
+                            <Link className="rounded-full px-3 py-2 transition-colors hover:bg-card" href={`/store/${store.slug}/orders`}>
+                                Track order
+                            </Link>
                         </nav>
                     </div>
 

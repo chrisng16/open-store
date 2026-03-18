@@ -147,7 +147,7 @@ function OptionListSection({
     onChange: (listId: string, optionId: string, delta: number) => void;
 }) {
     const isOptional = list.is_optional;
-    const isRadio = list.selection_node === "single_select";
+    const isRadio = !list.is_optional && list.max_num_options === 1;
     const atMax =
         list.max_aggregate_options_quantity > 0 &&
         groupTotal(selections, list.id) >= list.max_aggregate_options_quantity;

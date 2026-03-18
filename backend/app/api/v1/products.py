@@ -15,7 +15,7 @@ from app.schemas.product import (
     CategoryUpdate,
     CategoryResponse,
     CategoriesPageResponse,
-    ProductListItemResponse,
+    ProductWithCategoryListItemResponse,
     ProductsPageResponse,
     ProductCreate,
     ProductUpdate,
@@ -166,7 +166,11 @@ async def list_products(
     pagination: OffsetPaginationParams = Depends(get_offset_pagination),
     db: AsyncSession = Depends(get_db),
 ):
-    filtered_query = select(Product).where(Product.store_id == store_id)
+    filtered_query = (
+        select(Product)
+        .outerjoin(Category, Product.category_id == Category.id)
+        .where(Product.store_id == store_id)
+    )
 
     if status_filter == "active":
         filtered_query = filtered_query.where(Product.is_active.is_(True))
@@ -196,6 +200,7 @@ async def list_products(
         sort,
         allowed_columns={
             "name": Product.name,
+            "category": func.coalesce(Category.name, ""),
             "unitAmount": Product.unit_amount,
             "isActive": Product.is_active,
             "sortOrder": Product.sort_order,
@@ -209,12 +214,13 @@ async def list_products(
 
     result = await db.execute(
         filtered_query
+        .options(selectinload(Product.category))
         .order_by(sort_expression, tie_breaker)
         .limit(window.page_size)
         .offset(window.offset)
     )
     product_items = [
-        ProductListItemResponse.model_validate(product)
+        ProductWithCategoryListItemResponse.model_validate(product)
         for product in result.scalars().unique().all()
     ]
     return ProductsPageResponse(

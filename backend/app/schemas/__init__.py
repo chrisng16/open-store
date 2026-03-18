@@ -18,6 +18,8 @@ from app.schemas.product import (
 )
 from app.schemas.order import (
     OrderCreate,
+    OrderLookupRequest,
+    OrderLookupResponse,
     OrderItemCreate,
     OrderItemOptionCreate,
     OrderResponse,
@@ -59,6 +61,8 @@ __all__ = [
     "OptionCreate",
     "OptionResponse",
     "OrderCreate",
+    "OrderLookupRequest",
+    "OrderLookupResponse",
     "OrderItemCreate",
     "OrderItemOptionCreate",
     "OrderResponse",

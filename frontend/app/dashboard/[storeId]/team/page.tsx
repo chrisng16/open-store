@@ -307,7 +307,7 @@ export default function TeamPage({
             <div className="h-full flex flex-col flex-1">
                 <TeamSubNav />
                 <Tabs className="px-4 md:px-6 flex-1" value={activeTab} onValueChange={handleTabChange}>
-                    <div className="sticky top-19 z-20 flex items-center justify-between border-b bg-background-elevated/80 py-2">
+                    <div className="sticky top-16 z-20 flex items-center justify-between border-b bg-background-elevated/80 py-2">
                         <TabsList variant="line">
                             <TabsTrigger value="members">Team Members</TabsTrigger>
                             <TabsTrigger value="roles">Roles</TabsTrigger>

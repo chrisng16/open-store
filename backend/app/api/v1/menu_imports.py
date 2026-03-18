@@ -22,6 +22,7 @@ from app.schemas.menu_import import (
 )
 from app.schemas.upload import CreateMenuImportFromUploadRequest
 from app.services.storage import upload_file
+from app.workers.menu_ingestion import QUEUE_AI  # single source of truth for queue name
 
 router = APIRouter(prefix="/stores/{store_id}/menu-imports", tags=["menu-imports"])
 
@@ -36,7 +37,7 @@ def _detect_file_type(filename: str) -> FileType:
     raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
 
-def _redis_settings() -> RedisSettings:
+def _build_redis_settings() -> RedisSettings:
     settings = get_settings()
     parsed = urlparse(settings.redis_url)
     host = parsed.hostname or "localhost"
@@ -61,8 +62,12 @@ def _redis_settings() -> RedisSettings:
 
 async def _enqueue_menu_import(import_id: uuid.UUID) -> bool:
     try:
-        redis = await create_pool(_redis_settings())
-        await redis.enqueue_job("process_menu_import_task", str(import_id))
+        redis = await create_pool(_build_redis_settings())
+        await redis.enqueue_job(
+            "process_menu_import_task",
+            str(import_id),
+            _queue_name=QUEUE_AI,  # must match AIWorkerSettings.queue_name
+        )
         await redis.close()
         return True
     except Exception:

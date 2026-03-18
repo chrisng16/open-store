@@ -7,16 +7,12 @@ from app.schemas.pagination import PaginationMetadata
 
 class OrderItemOptionCreate(BaseModel):
     option_id: uuid.UUID
-    option_name: str
-    unit_amount: int = Field(default=0, ge=0)
     quantity: int = Field(default=1, ge=1)
 
 
 class OrderItemCreate(BaseModel):
     product_id: uuid.UUID
-    product_name: str
     quantity: int = Field(..., ge=1)
-    unit_amount: int = Field(..., ge=0)
     options: list[OrderItemOptionCreate] = []
 
 
@@ -26,6 +22,17 @@ class OrderCreate(BaseModel):
     customer_phone: str | None = None
     notes: str | None = None
     items: list[OrderItemCreate] = Field(..., min_length=1)
+
+
+class OrderLookupRequest(BaseModel):
+    order_number: str = Field(..., min_length=4, max_length=32)
+    email: str | None = None
+    phone: str | None = None
+
+
+class OrderLookupResponse(BaseModel):
+    order_id: uuid.UUID
+    order_access_token: str
 
 
 class OrderItemOptionResponse(BaseModel):
@@ -65,7 +72,16 @@ class OrderResponse(BaseModel):
     customer_email: str | None
     customer_phone: str | None
     notes: str | None
-    order_number: int
+    order_access_token: str | None = None
+
+    # Replaces order_number.
+    # display_id is what customers see ("K7XP0042").
+    # order_reference is for support staff and internal tooling ("20250315-42-K7XP").
+    # daily_sequence is exposed so frontends can sort/display the day's count if needed.
+    display_id: str
+    order_reference: str
+    daily_sequence: int
+
     items: list[OrderItemResponse] = []
     created_at: datetime
     updated_at: datetime

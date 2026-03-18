@@ -101,7 +101,7 @@ export default function StoreOnboardingPage({ params }: OnboardingPageProps) {
             <Card>
                 <CardHeader>
                     <CardTitle>Checklist</CardTitle>
-                    <CardDescription>Required onboarding steps</CardDescription>
+                    <CardDescription>Store setup steps</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                     {data.steps.map((step) => (

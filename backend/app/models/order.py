@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import String, Text, Integer, ForeignKey, Enum
+from sqlalchemy import String, Text, Integer, ForeignKey, Enum, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import inspect
@@ -18,6 +18,20 @@ class OrderStatus(str, enum.Enum):
 
 class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "orders"
+    __table_args__ = (
+        # Uniqueness is now scoped to store + day + sequence so the sequence
+        # can safely reset to 1 each UTC day without collisions across days.
+        UniqueConstraint(
+            "store_id", "daily_sequence", "order_token",
+            name="uq_orders_store_daily_sequence_token",
+        ),
+        # Unique index on order_reference for support-tool lookups.
+        # Partial or full — full is fine since the reference already encodes
+        # the store date, making collisions across stores impossible.
+        Index("ix_orders_order_reference", "order_reference", unique=True),
+        # Non-unique index on display_id so customer-facing search is fast.
+        Index("ix_orders_display_id", "display_id"),
+    )
 
     store_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("stores.id", ondelete="CASCADE"), nullable=False, index=True
@@ -36,7 +50,33 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     customer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     customer_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    order_number: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # ------------------------------------------------------------------
+    # Order identification — replaces the old all-time `order_number`.
+    #
+    #   daily_sequence   int          Resets to 1 each UTC day per store.
+    #                                 Kept small and human-readable.
+    #
+    #   order_token      VARCHAR(8)   Random suffix (e.g. "K7XP").
+    #                                 Prevents enumeration without being a
+    #                                 true secret.
+    #
+    #   order_reference  VARCHAR(32)  Internal / support-staff reference.
+    #                                 Format: "YYYYMMDD-<token>-<seq>"
+    #                                 e.g.    "20250315-K7XP-0042"
+    #                                 Encodes the date so DB lookups can
+    #                                 constrain created_at for partition
+    #                                 pruning.
+    #
+    #   display_id       VARCHAR(16)  Customer-facing ID shown on receipts,
+    #                                 confirmation emails, and SMS.
+    #                                 Format: "<token>-<seq>"
+    #                                 e.g.    "K7XP-0042"
+    # ------------------------------------------------------------------
+    daily_sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    order_token: Mapped[str] = mapped_column(String(8), nullable=False)
+    order_reference: Mapped[str] = mapped_column(String(32), nullable=False)
+    display_id: Mapped[str] = mapped_column(String(16), nullable=False)
 
     # Relationships
     store: Mapped["Store"] = relationship(back_populates="orders")
@@ -44,10 +84,10 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     def __repr__(self) -> str:
         state = inspect(self)
-        order_number = state.dict.get("order_number")
+        display_id = state.dict.get("display_id")
         status = state.dict.get("status")
-        if order_number is not None and status is not None:
-            return f"<Order #{order_number} {status}>"
+        if display_id is not None and status is not None:
+            return f"<Order {display_id} {status}>"
         identity = state.identity[0] if state.identity else None
         return f"<Order id={identity}>"
 

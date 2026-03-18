@@ -25,7 +25,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { memo, use, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { memo, use, useMemo, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 
 const ProductEditorDialog = dynamic(
@@ -166,7 +166,6 @@ export default function ImportReviewPage({
         setDrafts,
         editorItemId,
         editorFormData,
-        setEditorFormData,
         statusFilter,
         setStatusFilter,
         isPublishConfirmOpen,
@@ -310,12 +309,11 @@ export default function ImportReviewPage({
         },
     });
 
-    async function handleEditorSubmit(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
+    async function handleEditorSubmit(formData: ProductFormData) {
         if (!editorItemId) return;
         await editMutation.mutateAsync({
             itemId: editorItemId,
-            formData: editorFormData,
+            formData,
         });
     }
 
@@ -483,14 +481,13 @@ export default function ImportReviewPage({
                             resetEditor();
                         }
                     }}
-                    formData={editorFormData}
-                    onFormDataChange={setEditorFormData}
+                    initialFormData={editorFormData}
                     categories={categoryOptions}
                     isSaving={editMutation.isPending}
                     isUploadingImage={false}
                     onSubmit={handleEditorSubmit}
                     onUploadImage={async () => {
-                        return;
+                        return "";
                     }}
                 />
                 <BulkCategoryDialog

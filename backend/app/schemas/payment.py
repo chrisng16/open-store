@@ -1,8 +1,7 @@
 import uuid
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class CreatePaymentIntentRequest(BaseModel):
-    store_id: uuid.UUID
-    amount: int = Field(..., gt=0)
+    order_id: uuid.UUID

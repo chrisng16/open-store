@@ -11,8 +11,9 @@ async function getStoreBySlug(slug: string) {
     return res.json();
 }
 
-async function getOrder(storeId: string, orderId: string) {
-    const res = await fetch(`${API_URL}/stores/${storeId}/orders/${orderId}`, {
+async function getOrder(storeId: string, orderId: string, accessToken?: string) {
+    const query = accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : "";
+    const res = await fetch(`${API_URL}/stores/${storeId}/orders/${orderId}${query}`, {
         cache: "no-store",
     });
     if (!res.ok) return null;
@@ -30,14 +31,17 @@ const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secon
 
 export default async function OrderPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ slug: string; orderId: string }>;
+    searchParams: Promise<{ access?: string }>;
 }) {
     const { slug, orderId } = await params;
+    const { access } = await searchParams;
     const store = await getStoreBySlug(slug);
     if (!store) notFound();
 
-    const order = await getOrder(store.id, orderId);
+    const order = await getOrder(store.id, orderId, access);
     if (!order) notFound();
 
     const statusInfo = STATUS_LABELS[order.status] || STATUS_LABELS.pending;
@@ -48,7 +52,7 @@ export default async function OrderPage({
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Order placed</p>
                 <h1 className="mt-3 text-3xl font-semibold tracking-tight">Order confirmed</h1>
                 <p className="mt-2 text-muted-foreground">
-                    Order #{order.order_number}
+                    Order #{order.display_id || order.order_reference}
                 </p>
                 <Badge variant={statusInfo.variant} className="mt-3 rounded-full px-3 py-1">
                     {statusInfo.label}
