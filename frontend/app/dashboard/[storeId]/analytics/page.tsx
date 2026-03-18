@@ -10,11 +10,8 @@ import { use } from "react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type StoreSummary = {
-    id: string;
-    name: string;
-    slug: string;
-};
+import { Store } from "@/lib/types";
+
 
 type OrderStatus =
     | "pending"
@@ -141,7 +138,7 @@ function MetricsGrid({
 function AnalyticsDashboard({ storeId }: { storeId: string }) {
     const storeQuery = useQuery({
         queryKey: ["store", storeId],
-        queryFn: () => fetchWithAccessToken<StoreSummary>(`/stores/${storeId}`),
+        queryFn: () => fetchWithAccessToken<Store>(`/stores/${storeId}`),
         staleTime: 5 * 60 * 1000,
     });
 
@@ -159,9 +156,7 @@ function AnalyticsDashboard({ storeId }: { storeId: string }) {
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
             <StoreSubNav
-                storeId={storeId}
-                storeName={storeQuery.data?.name}
-                storeSlug={storeQuery.data?.slug}
+                store={storeQuery.data}
                 pending={storeQuery.isPending}
             />
             <div className="flex-1 overflow-y-auto px-4 pb-8 md:px-6">

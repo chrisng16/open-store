@@ -1,67 +1,18 @@
 import { MenuBrowser } from "@/components/store/menu-browser";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-
-type Product = {
-    id: string;
-    store_id: string;
-    category_id: string | null;
-    name: string;
-    description: string | null;
-    unit_amount: number;
-    image_url: string | null;
-    dietary_tags: string[] | null;
-    allergens: string[] | null;
-};
-
-type Category = {
-    id: string;
-    name: string;
-    description: string | null;
-};
+import { StoreNotActive } from "@/components/store/store-not-active";
+import { api } from "@/lib/api";
+import { Category, ProductWithCategoryListItem, Store } from "@/lib/types";
 
 async function getCategories(storeId: string): Promise<Category[]> {
-    try {
-        const res = await fetch(
-            `${API_URL}/stores/${storeId}/categories?status_filter=active&page=1&page_size=500`,
-            {
-                next: { revalidate: 30 },
-            }
-        );
-        if (!res.ok) return [];
-        const data = await res.json();
-        return Array.isArray(data) ? data : (data.items ?? []);
-    } catch {
-        return [];
-    }
+    return api.categories.list(storeId);
 }
 
-async function getProducts(storeId: string): Promise<Product[]> {
-    try {
-        const res = await fetch(
-            `${API_URL}/stores/${storeId}/products?page=1&page_size=500`,
-            {
-                next: { revalidate: 30 },
-            }
-        );
-        if (!res.ok) return [];
-        const data = await res.json();
-        return Array.isArray(data) ? data : (data.items ?? []);
-    } catch {
-        return [];
-    }
+async function getProducts(storeId: string): Promise<ProductWithCategoryListItem[]> {
+    return api.products.list(storeId);
 }
 
-async function getStoreBySlug(slug: string) {
-    try {
-        const res = await fetch(`${API_URL}/stores/slug/${slug}`, {
-            next: { revalidate: 60 },
-        });
-        if (!res.ok) return null;
-        return res.json();
-    } catch {
-        return null;
-    }
+async function getStoreBySlug(slug: string): Promise<Store> {
+    return api.stores.getBySlug(slug);
 }
 
 export default async function MenuPage({
@@ -75,7 +26,13 @@ export default async function MenuPage({
     const { category } = await searchParams;
 
     const store = await getStoreBySlug(slug);
+
+    console.log("Fetched store for slug:", slug, store); // Debug log
     if (!store) return <div className="p-8 text-center">Store not found</div>;
+
+    if (store && store.isActive === false) {
+        return <StoreNotActive storeName={store.name} />;
+    }
 
     const [categories, products] = await Promise.all([
         getCategories(store.id),
@@ -84,16 +41,16 @@ export default async function MenuPage({
 
     const activeCategoryIds = new Set(categories.map((cat) => cat.id));
     const visibleProducts = products.filter(
-        (product) => !product.category_id || activeCategoryIds.has(product.category_id)
+        (product) => !product.categoryId || activeCategoryIds.has(product.categoryId)
     );
 
     const productsByCategory = categories.map((cat) => ({
         ...cat,
-        products: visibleProducts.filter((p) => p.category_id === cat.id),
+        products: visibleProducts.filter((p) => p.categoryId === cat.id),
     }));
 
     // Include uncategorized products
-    const uncategorized = visibleProducts.filter((p) => !p.category_id);
+    const uncategorized = visibleProducts.filter((p) => !p.categoryId);
 
     const hasRequestedCategory =
         category && categories.some((cat) => cat.id === category);

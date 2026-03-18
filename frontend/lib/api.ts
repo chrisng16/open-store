@@ -1,3 +1,17 @@
+import { denormalizeRequest, normalizeResponse } from "./normalize-response";
+import { 
+    Store, 
+    StoreOnboardingStatus, 
+    StorePublic, 
+    Category, 
+    Product, 
+    ProductWithCategoryListItem,
+    Order,
+    MenuImport,
+    MenuImportItem,
+    PaymentIntent,
+} from "./types";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 type RequestOptions = {
@@ -19,7 +33,7 @@ class ApiError extends Error {
     }
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const { method = "GET", body, token, headers: extraHeaders } = options;
 
     const headers: Record<string, string> = {
@@ -30,14 +44,17 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         headers["Authorization"] = `Bearer ${token}`;
     }
 
-    if (body && !(body instanceof FormData)) {
+    const isJson = !(body instanceof FormData);
+    if (isJson) {
         headers["Content-Type"] = "application/json";
     }
+
+    const normalizedBody = isJson ? denormalizeRequest(body) : body;
 
     const res = await fetch(`${API_URL}${path}`, {
         method,
         headers,
-        body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
+        body: isJson ? JSON.stringify(normalizedBody) : (body as FormData),
     });
 
     if (!res.ok) {
@@ -50,96 +67,98 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     }
 
     if (res.status === 204) return undefined as T;
-    return res.json();
+
+    const json = await res.json();
+    return normalizeResponse<T>(json);
 }
 
 // --- Stores ---
 
 export const api = {
     stores: {
-        create: (data: unknown, token: string) =>
-            request("/stores", { method: "POST", body: data, token }),
+        create: (data: { name: string, slug: string, description?: string }, token: string) =>
+            apiRequest<Store>("/stores", { method: "POST", body: data, token }),
         getBySlug: (slug: string) =>
-            request(`/stores/slug/${slug}`),
+            apiRequest<StorePublic>(`/stores/slug/${slug}`),
         getById: (storeId: string) =>
-            request(`/stores/${storeId}`),
-        update: (storeId: string, data: unknown, token: string) =>
-            request(`/stores/${storeId}`, { method: "PATCH", body: data, token }),
+            apiRequest<Store>(`/stores/${storeId}`),
+        update: (storeId: string, data: Partial<Store>, token: string) =>
+            apiRequest<Store>(`/stores/${storeId}`, { method: "PATCH", body: data, token }),
         onboardingStatus: (storeId: string, token: string) =>
-            request(`/stores/${storeId}/onboarding-status`, { token }),
+            apiRequest<StoreOnboardingStatus>(`/stores/${storeId}/onboarding-status`, { token }),
         refreshOnboardingStatus: (storeId: string, token: string) =>
-            request(`/stores/${storeId}/onboarding-status/refresh`, { method: "POST", token }),
+            apiRequest<StoreOnboardingStatus>(`/stores/${storeId}/onboarding-status/refresh`, { method: "POST", token }),
         listMine: (token: string) =>
-            request(`/stores/mine/members`, { token }),
+            apiRequest<Store[]>("/stores", { token }),
     },
 
     categories: {
         list: (storeId: string) =>
-            request<{ items: unknown[] }>(`/stores/${storeId}/categories?page=1&page_size=500`).then((response) => response.items),
-        create: (storeId: string, data: unknown, token: string) =>
-            request(`/stores/${storeId}/categories`, { method: "POST", body: data, token }),
-        update: (storeId: string, categoryId: string, data: unknown, token: string) =>
-            request(`/stores/${storeId}/categories/${categoryId}`, { method: "PATCH", body: data, token }),
+            apiRequest<{ items: Category[] }>(`/stores/${storeId}/categories?page=1&page_size=500`).then((response) => response.items),
+        create: (storeId: string, data: Partial<Category>, token: string) =>
+            apiRequest<Category>(`/stores/${storeId}/categories`, { method: "POST", body: data, token }),
+        update: (storeId: string, categoryId: string, data: Partial<Category>, token: string) =>
+            apiRequest<Category>(`/stores/${storeId}/categories/${categoryId}`, { method: "PATCH", body: data, token }),
         delete: (storeId: string, categoryId: string, token: string) =>
-            request(`/stores/${storeId}/categories/${categoryId}`, { method: "DELETE", token }),
+            apiRequest(`/stores/${storeId}/categories/${categoryId}`, { method: "DELETE", token }),
     },
 
     products: {
         list: (storeId: string, categoryId?: string) =>
-            request<{ items: unknown[] }>(`/stores/${storeId}/products?page=1&page_size=500${categoryId ? `&category_id=${categoryId}` : ""}`).then((response) => response.items),
+            apiRequest<{ items: ProductWithCategoryListItem[] }>(`/stores/${storeId}/products?page=1&page_size=500${categoryId ? `&category_id=${categoryId}` : ""}`).then((response) => response.items),
         get: (storeId: string, productId: string) =>
-            request(`/stores/${storeId}/products/${productId}`),
-        create: (storeId: string, data: unknown, token: string) =>
-            request(`/stores/${storeId}/products`, { method: "POST", body: data, token }),
-        update: (storeId: string, productId: string, data: unknown, token: string) =>
-            request(`/stores/${storeId}/products/${productId}`, { method: "PATCH", body: data, token }),
+            apiRequest<Product>(`/stores/${storeId}/products/${productId}`),
+        create: (storeId: string, data: Partial<Product>, token: string) =>
+            apiRequest<Product>(`/stores/${storeId}/products`, { method: "POST", body: data, token }),
+        update: (storeId: string, productId: string, data: Partial<Product>, token: string) =>
+            apiRequest<Product>(`/stores/${storeId}/products/${productId}`, { method: "PATCH", body: data, token }),
         delete: (storeId: string, productId: string, token: string) =>
-            request(`/stores/${storeId}/products/${productId}`, { method: "DELETE", token }),
+            apiRequest(`/stores/${storeId}/products/${productId}`, { method: "DELETE", token }),
     },
 
     orders: {
-        create: (storeId: string, data: unknown) =>
-            request(`/stores/${storeId}/orders`, { method: "POST", body: data }),
-        lookup: (storeId: string, data: { order_number: string; email?: string; phone?: string }) =>
-            request<{ order_id: string; order_access_token: string }>(`/stores/${storeId}/orders/lookup`, { method: "POST", body: data }),
+        create: (storeId: string, data: { customerName?: string, customerEmail?: string, customerPhone?: string, notes?: string, items: { productId: string, quantity: number, options: { optionId: string, quantity: number }[] }[] }) =>
+            apiRequest<Order>(`/stores/${storeId}/orders`, { method: "POST", body: data }),
+        lookup: (storeId: string, data: { orderNumber: string; email?: string; phone?: string }) =>
+            apiRequest<{ orderId: string; orderAccessToken: string }>(`/stores/${storeId}/orders/lookup`, { method: "POST", body: data }),
         list: (storeId: string, token: string, statusFilter?: string) =>
-            request<{ items: unknown[] }>(`/stores/${storeId}/orders?page=1&page_size=500${statusFilter ? `&status=${statusFilter}` : ""}`, { token }).then((response) => response.items),
+            apiRequest<{ items: Order[] }>(`/stores/${storeId}/orders?page=1&page_size=500${statusFilter ? `&status=${statusFilter}` : ""}`, { token }).then((response) => response.items),
         get: (storeId: string, orderId: string) =>
-            request(`/stores/${storeId}/orders/${orderId}`),
+            apiRequest<Order>(`/stores/${storeId}/orders/${orderId}`),
         updateStatus: (storeId: string, orderId: string, status: string, token: string) =>
-            request(`/stores/${storeId}/orders/${orderId}/status`, { method: "PATCH", body: { status }, token }),
+            apiRequest<Order>(`/stores/${storeId}/orders/${orderId}/status`, { method: "PATCH", body: { status }, token }),
     },
 
     menuImports: {
         upload: (storeId: string, file: File, token: string) => {
             const formData = new FormData();
             formData.append("file", file);
-            return request(`/stores/${storeId}/menu-imports/upload`, { method: "POST", body: formData, token });
+            return apiRequest<MenuImport>(`/stores/${storeId}/menu-imports/upload`, { method: "POST", body: formData, token });
         },
         process: (storeId: string, importId: string, token: string) =>
-            request(`/stores/${storeId}/menu-imports/${importId}/process`, { method: "POST", token }),
+            apiRequest<MenuImport>(`/stores/${storeId}/menu-imports/${importId}/process`, { method: "POST", token }),
         get: (storeId: string, importId: string, token: string) =>
-            request(`/stores/${storeId}/menu-imports/${importId}`, { token }),
+            apiRequest<MenuImport>(`/stores/${storeId}/menu-imports/${importId}`, { token }),
         list: (storeId: string, token: string) =>
-            request(`/stores/${storeId}/menu-imports`, { token }),
-        updateItem: (storeId: string, importId: string, itemId: string, data: unknown, token: string) =>
-            request(`/stores/${storeId}/menu-imports/${importId}/items/${itemId}`, { method: "PATCH", body: data, token }),
+            apiRequest<MenuImport[]>(`/stores/${storeId}/menu-imports`, { token }),
+        updateItem: (storeId: string, importId: string, itemId: string, data: Partial<MenuImportItem>, token: string) =>
+            apiRequest<MenuImportItem>(`/stores/${storeId}/menu-imports/${importId}/items/${itemId}`, { method: "PATCH", body: data, token }),
         publish: (storeId: string, importId: string, token: string) =>
-            request(`/stores/${storeId}/menu-imports/${importId}/publish`, { method: "POST", token }),
+            apiRequest<MenuImport>(`/stores/${storeId}/menu-imports/${importId}/publish`, { method: "POST", token }),
     },
 
     payments: {
         createIntent: (orderId: string) =>
-            request("/payments/create-intent", { method: "POST", body: { order_id: orderId } }),
+            apiRequest<PaymentIntent>("/payments/create-intent", { method: "POST", body: { orderId: orderId } }),
     },
 
     stripe: {
         onboard: (storeId: string, token: string) =>
-            request(`/stores/${storeId}/stripe/onboard`, { method: "POST", token }),
+            apiRequest<{ url: string }>(`/stores/${storeId}/stripe/onboard`, { method: "POST", token }),
         status: (storeId: string, token: string) =>
-            request(`/stores/${storeId}/stripe/status`, { token }),
+            apiRequest<{ status: string }>(`/stores/${storeId}/stripe/status`, { token }),
         loginLink: (storeId: string, token: string) =>
-            request(`/stores/${storeId}/stripe/login-link`, { method: "POST", token }),
+            apiRequest<{ url: string }>(`/stores/${storeId}/stripe/login-link`, { method: "POST", token }),
     },
 };
 

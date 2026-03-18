@@ -3,38 +3,34 @@
 import { Badge } from "@/components/ui/badge";
 import { useMenuScrollSpy } from "@/hooks/use-menu-scroll-spy";
 import { useCartMutations } from "@/lib/cart-store";
+import { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useStorefrontProductDialogState } from "@/stores/ui-store";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ProductDialog, type ProductDialogProduct } from "./product-dialog";
+import { ProductDialog } from "./product-dialog";
 
 type Option = {
     id: string;
     name: string;
-    unit_amount: number;
-    min_option_choice_quantity: number;
-    max_option_choice_quantity: number;
-    default_quantity: number;
+    unitAmount: number;
+    minOptionChoiceQuantity: number;
+    maxOptionChoiceQuantity: number;
+    defaultQuantity: number;
 };
 type OptionList = {
     id: string;
     name: string;
-    selection_node: "single_select" | "multi_select" | "aggregate_quantity";
-    min_num_options: number;
-    max_num_options: number;
-    min_aggregate_options_quantity: number;
-    max_aggregate_options_quantity: number;
-    is_optional: boolean;
+    selectionNode: "single_select" | "multi_select" | "aggregate_quantity";
+    minNumOptions: number;
+    maxNumOptions: number;
+    minAggregateOptionsQuantity: number;
+    maxAggregateOptionsQuantity: number;
+    isOptional: boolean;
     options: Option[];
 };
-type Product = {
-    id: string; store_id: string; category_id: string | null;
-    name: string; description: string | null; unit_amount: number;
-    image_url: string | null; dietary_tags: string[] | null;
-    allergens: string[] | null;
-};
+
 type CategorySection = { id: string; name: string; description: string | null; products: Product[] };
 
 const DIETARY_ICONS: Record<string, string> = {
@@ -194,15 +190,15 @@ export function MenuBrowser({
                 preview={{
                     name: selectedProduct?.name,
                     description: selectedProduct?.description,
-                    image_url: selectedProduct?.image_url,
+                    imageUrl: selectedProduct?.imageUrl,
                 }}
                 onClose={storefrontProductDialog.close}
                 onAddToCart={(
-                    product: ProductDialogProduct,
+                    product: Product,
                     selections: Record<string, Record<string, number>>,
                     qty: number
                 ) => {
-                    const options = product.option_lists.flatMap((list) =>
+                    const options = product.optionLists.flatMap((list) =>
                         list.options.flatMap((option): {
                             option_id: string;
                             option_name: string;
@@ -237,7 +233,7 @@ export function MenuBrowser({
                         product_name: product.name,
                         quantity: qty,
                         options,
-                        image_url: product.image_url,
+                        image_url: product.imageUrl,
                     });
                     storefrontProductDialog.close();
                 }}
@@ -333,8 +329,8 @@ function ProductCard({
                         )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-bold">${(Number(product.unit_amount) / 100).toFixed(2)}</p>
-                        {product.dietary_tags?.map((tag) => (
+                        <p className="text-sm font-bold">${(Number(product.unitAmount) / 100).toFixed(2)}</p>
+                        {product.dietaryTags?.map((tag) => (
                             <Badge key={tag} variant="secondary" className="text-xs">
                                 {DIETARY_ICONS[tag] || ""} {tag}
                             </Badge>
@@ -342,10 +338,10 @@ function ProductCard({
                     </div>
                 </div>
 
-                {product.image_url ? (
+                {product.imageUrl ? (
                     <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg">
                         <img
-                            src={product.image_url}
+                            src={product.imageUrl}
                             alt={product.name}
                             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />

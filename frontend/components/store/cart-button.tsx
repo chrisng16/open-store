@@ -16,6 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCartPricing } from "@/lib/cart-pricing";
 import { type CartItem, useCartHydrated, useCartMutations, useCartSummary } from "@/lib/cart-store";
+import { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useCartProductDialogState } from "@/stores/ui-store";
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
@@ -60,14 +61,14 @@ export function CartButton({
                 storeId={storeId}
                 preview={{
                     name: editingItem?.product_name,
-                    image_url: editingItem?.image_url ?? null,
+                    imageUrl: editingItem?.image_url ?? null,
                 }}
                 cartItem={editingItem ?? undefined}
-                onSaveEdit={(id, selections, qty, product) => {
+                onSaveEdit={(id, selections, qty, product: Product) => {
                     const options = Object.entries(selections).flatMap(([listId, optionMap]) =>
                         Object.entries(optionMap).flatMap(([optionId, selectedCount]) => {
                             if (selectedCount <= 0) return [];
-                            const current = product.option_lists
+                            const current = product.optionLists
                                 .find((list) => list.id === listId)
                                 ?.options.find((opt) => opt.id === optionId);
                             return [{

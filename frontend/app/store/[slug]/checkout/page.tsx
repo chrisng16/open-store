@@ -301,32 +301,25 @@ function CheckoutForm({
             if (!card) throw new Error("Card details are missing.");
 
             const orderItems = items.map((item) => ({
-                product_id: item.product_id,
-                product_name: item.product_name,
+                productId: item.product_id,
                 quantity: item.quantity,
-                unit_amount: item.unit_amount,
                 options: item.options.map((opt) => ({
-                    option_id: opt.option_id,
-                    option_name: opt.option_name,
-                    unit_amount: opt.unit_amount,
+                    optionId: opt.option_id,
                     quantity: opt.quantity,
                 })),
             }));
 
-            const order = (await api.orders.create(storeId, {
-                customer_name: name || null,
-                customer_email: email || null,
-                customer_phone: phone || null,
-                notes: notes || null,
+            const order = await api.orders.create(storeId, {
+                customerName: name || undefined,
+                customerEmail: email || undefined,
+                customerPhone: phone || undefined,
+                notes: notes || undefined,
                 items: orderItems,
-            })) as { id: string; display_id: string; order_access_token?: string | null };
+            });
 
-            const paymentIntent = (await api.payments.createIntent(order.id)) as {
-                client_secret: string;
-                payment_intent_id: string;
-            };
+            const paymentIntent = await api.payments.createIntent(order.id);
 
-            const confirmation = await stripe.confirmCardPayment(paymentIntent.client_secret, {
+            const confirmation = await stripe.confirmCardPayment(paymentIntent.clientSecret, {
                 payment_method: {
                     card,
                     billing_details: {
@@ -342,8 +335,8 @@ function CheckoutForm({
                 throw new Error("Payment was not completed. Please try again.");
 
             clearCart();
-            const accessParam = order.order_access_token
-                ? `?access=${encodeURIComponent(order.order_access_token)}`
+            const accessParam = order.orderAccessToken
+                ? `?access=${encodeURIComponent(order.orderAccessToken)}`
                 : "";
             router.push(`/store/${slug}/orders/${order.id}${accessParam}`);
         } catch (err) {

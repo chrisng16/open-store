@@ -16,42 +16,14 @@ import { Minus, Plus } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Option = {
-    id: string;
-    name: string;
-    unit_amount: number;
-    min_option_choice_quantity: number;
-    max_option_choice_quantity: number;
-    default_quantity: number;
-};
-
-export type OptionList = {
-    id: string;
-    name: string;
-    selection_node: "single_select" | "multi_select" | "aggregate_quantity";
-    min_num_options: number;
-    max_num_options: number;
-    min_aggregate_options_quantity: number;
-    max_aggregate_options_quantity: number;
-    is_optional: boolean;
-    options: Option[];
-};
-
-export type ProductDialogProduct = {
-    id: string;
-    name: string;
-    description: string | null;
-    unit_amount: number;
-    image_url: string | null;
-    option_lists: OptionList[];
-};
+import { Product, OptionList } from "@/lib/types";
 
 type Selections = Record<string, Record<string, number>>;
 
 type ProductPreview = {
     name?: string;
     description?: string | null;
-    image_url?: string | null;
+    imageUrl?: string | null;
 };
 
 function groupTotal(sel: Selections, groupId: string) {
@@ -61,24 +33,24 @@ function groupTotal(sel: Selections, groupId: string) {
 function isListSatisfied(list: OptionList, sel: Selections) {
     const total = groupTotal(sel, list.id);
     const selectedOptions = Object.values(sel[list.id] ?? {}).filter((n) => n > 0).length;
-    const minNum = list.is_optional ? 0 : list.min_num_options;
+    const minNum = list.isOptional ? 0 : list.minNumOptions;
     if (selectedOptions < minNum) return false;
-    if (list.max_num_options > 0 && selectedOptions > list.max_num_options) return false;
-    if (list.selection_node === "aggregate_quantity") {
-        if (total < list.min_aggregate_options_quantity) return false;
-        if (list.max_aggregate_options_quantity > 0 && total > list.max_aggregate_options_quantity) return false;
+    if (list.maxNumOptions > 0 && selectedOptions > list.maxNumOptions) return false;
+    if (list.selectionNode === "aggregate_quantity") {
+        if (total < list.minAggregateOptionsQuantity) return false;
+        if (list.maxAggregateOptionsQuantity > 0 && total > list.maxAggregateOptionsQuantity) return false;
     }
     return true;
 }
 
-function totalPrice(product: ProductDialogProduct, sel: Selections, qty: number) {
+function totalPrice(product: Product, sel: Selections, qty: number) {
     let extra = 0;
-    for (const list of product.option_lists) {
+    for (const list of product.optionLists) {
         for (const option of list.options) {
-            extra += (sel[list.id]?.[option.id] ?? 0) * option.unit_amount;
+            extra += (sel[list.id]?.[option.id] ?? 0) * option.unitAmount;
         }
     }
-    return (product.unit_amount + extra) * qty;
+    return (product.unitAmount + extra) * qty;
 }
 
 function deriveSelectionsFromCartItem(cartItem?: CartItem): Selections {
@@ -146,11 +118,11 @@ function OptionListSection({
     selections: Selections;
     onChange: (listId: string, optionId: string, delta: number) => void;
 }) {
-    const isOptional = list.is_optional;
-    const isRadio = !list.is_optional && list.max_num_options === 1;
+    const isOptional = list.isOptional;
+    const isRadio = !list.isOptional && list.maxNumOptions === 1;
     const atMax =
-        list.max_aggregate_options_quantity > 0 &&
-        groupTotal(selections, list.id) >= list.max_aggregate_options_quantity;
+        list.maxAggregateOptionsQuantity > 0 &&
+        groupTotal(selections, list.id) >= list.maxAggregateOptionsQuantity;
     const satisfied = isListSatisfied(list, selections);
 
     return (
@@ -161,19 +133,19 @@ function OptionListSection({
                     {isOptional ? (
                         <>
                             <span>Optional</span>
-                            {list.max_num_options ? ` · Select up to ${list.max_num_options}` : ""}
+                            {list.maxNumOptions ? ` · Select up to ${list.maxNumOptions}` : ""}
                         </>
                     ) : (
                         <>
                             <span className={cn("font-medium", satisfied ? "text-green-600" : "text-amber-500")}>
                                 Required
                             </span>
-                            {` · Select ${list.min_num_options === list.max_num_options
-                                ? `exactly ${list.min_num_options}`
-                                : `at least ${list.min_num_options}`
+                            {` · Select ${list.minNumOptions === list.maxNumOptions
+                                ? `exactly ${list.minNumOptions}`
+                                : `at least ${list.minNumOptions}`
                                 }`}
-                            {list.max_num_options && list.max_num_options !== list.min_num_options
-                                ? ` (up to ${list.max_num_options})`
+                            {list.maxNumOptions && list.maxNumOptions !== list.minNumOptions
+                                ? ` (up to ${list.maxNumOptions})`
                                 : ""}
                         </>
                     )}
@@ -195,9 +167,9 @@ function OptionListSection({
                             <RadioGroupItem value={option.id} id={`radio-${option.id}`} />
                             <Label htmlFor={`radio-${option.id}`} className="flex-1 cursor-pointer">
                                 <span className="text-sm font-medium">{option.name}</span>
-                                {option.unit_amount !== 0 && (
+                                {option.unitAmount !== 0 && (
                                     <span className="ml-1.5 text-xs text-muted-foreground">
-                                        {option.unit_amount > 0 ? "+" : ""}${(option.unit_amount / 100).toFixed(2)}
+                                        {option.unitAmount > 0 ? "+" : ""}${(option.unitAmount / 100).toFixed(2)}
                                     </span>
                                 )}
                             </Label>
@@ -221,9 +193,9 @@ function OptionListSection({
                                     className="flex flex-1 cursor-pointer flex-col items-start justify-start gap-0"
                                 >
                                     <span className="text-sm font-medium">{option.name}</span>
-                                    {option.unit_amount !== 0 && (
+                                    {option.unitAmount !== 0 && (
                                         <span className="text-xs leading-tight text-muted-foreground">
-                                            {option.unit_amount > 0 ? "+" : ""}${(option.unit_amount / 100).toFixed(2)}
+                                            {option.unitAmount > 0 ? "+" : ""}${(option.unitAmount / 100).toFixed(2)}
                                         </span>
                                     )}
                                 </Label>
@@ -239,9 +211,9 @@ function OptionListSection({
                             <div key={option.id} className="flex items-center justify-between gap-3 px-4 py-3.5">
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium">{option.name}</p>
-                                    {option.unit_amount !== 0 && (
+                                    {option.unitAmount !== 0 && (
                                         <p className="mt-0.5 text-xs text-muted-foreground">
-                                            {option.unit_amount > 0 ? "+" : ""}${(option.unit_amount / 100).toFixed(2)}
+                                            {option.unitAmount > 0 ? "+" : ""}${(option.unitAmount / 100).toFixed(2)}
                                         </p>
                                     )}
                                 </div>
@@ -264,9 +236,9 @@ function ProductDialogSkeleton({ preview }: { preview?: ProductPreview }) {
     return (
         <>
             <div className="aspect-video w-full overflow-hidden">
-                {preview?.image_url ? (
+                {preview?.imageUrl ? (
                     <Image
-                        src={preview.image_url}
+                        src={preview.imageUrl}
                         alt={preview.name ?? "Product"}
                         width={640}
                         height={360}
@@ -329,13 +301,13 @@ export function ProductDialog({
     productId: string;
     storeId: string;
     onClose: () => void;
-    onAddToCart?: (product: ProductDialogProduct, selections: Selections, qty: number) => void;
+    onAddToCart?: (product: Product, selections: Selections, qty: number) => void;
     cartItem?: CartItem;
     onSaveEdit?: (
         id: string,
         selections: Selections,
         qty: number,
-        product: ProductDialogProduct
+        product: Product
     ) => void;
     initialQty?: number;
     initialSelections?: Selections;
@@ -363,11 +335,11 @@ export function ProductDialog({
         error,
         isPending,
         isFetching,
-    } = useQuery<ProductDialogProduct>({
+    } = useQuery<Product>({
         queryKey: productQueryKey,
-        queryFn: () => api.products.get(storeId, productId) as Promise<ProductDialogProduct>,
+        queryFn: () => api.products.get(storeId, productId),
         enabled: open && !!storeId && !!productId,
-        initialData: () => queryClient.getQueryData<ProductDialogProduct>(productQueryKey),
+        initialData: () => queryClient.getQueryData<Product>(productQueryKey),
         staleTime: 0,
         refetchOnMount: true,
     });
@@ -379,10 +351,10 @@ export function ProductDialog({
         (listId: string, optionId: string, delta: number) => {
             if (!product) return;
             setSelections((prev) => {
-                const list = product.option_lists.find((group) => group.id === listId);
+                const list = product.optionLists.find((group) => group.id === listId);
                 if (!list) return prev;
 
-                const isRadio = list.selection_node === "single_select";
+                const isRadio = list.selectionNode === "single_select";
                 const groupSel = { ...(prev[listId] ?? {}) };
 
                 if (isRadio && delta > 0) {
@@ -398,7 +370,7 @@ export function ProductDialog({
 
     const allSatisfied = useMemo(() => {
         if (!product) return false;
-        return product.option_lists.every((group) => isListSatisfied(group, selections));
+        return product.optionLists.every((group) => isListSatisfied(group, selections));
     }, [product, selections]);
 
     const price = useMemo(() => {
@@ -408,7 +380,7 @@ export function ProductDialog({
 
     const unsatisfiedCount = useMemo(() => {
         if (!product) return 0;
-        return product.option_lists.filter((group) => !isListSatisfied(group, selections)).length;
+        return product.optionLists.filter((group) => !isListSatisfied(group, selections)).length;
     }, [product, selections]);
 
     const handleAdd = () => {
@@ -447,7 +419,7 @@ export function ProductDialog({
                         <div className="flex-1 overflow-y-auto">
                             <div className="aspect-video w-full overflow-hidden relative">
                                 <Image
-                                    src={product.image_url || "https://static.photos/food/640x360/"}
+                                    src={product.imageUrl || "https://static.photos/food/640x360/"}
                                     alt={product.name}
                                     width={640}
                                     height={360}
@@ -463,7 +435,7 @@ export function ProductDialog({
                                     <DialogDescription>{product.description}</DialogDescription>
                                 </DialogHeader>
 
-                                {product.option_lists.map((optionList) => (
+                                {product.optionLists.map((optionList) => (
                                     <OptionListSection
                                         key={optionList.id}
                                         list={optionList}

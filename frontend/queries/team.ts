@@ -66,40 +66,40 @@ export type ApplyMemberRolesPayload = {
     updates: { memberId: string; roleId: string }[];
 };
 
-export const teamMembersQueryOptions = (storeId: string) =>
+export const teamMembersQueryOptions = (storeId: string | undefined) =>
     queryOptions({
         queryKey: ["team-members", storeId],
         queryFn: () => fetchWithAccessToken<TeamMember[]>(`/stores/${storeId}/members`),
         enabled: !!storeId,
     });
 
-export const teamInvitesQueryOptions = (storeId: string) =>
+export const teamInvitesQueryOptions = (storeId: string | undefined) =>
     queryOptions({
         queryKey: ["team-invites", storeId],
         queryFn: () => fetchWithAccessToken<TeamInvite[]>(`/stores/${storeId}/invites`),
         enabled: !!storeId,
     });
 
-export const teamRolesQueryOptions = (storeId: string) =>
+export const teamRolesQueryOptions = (storeId: string | undefined) =>
     queryOptions({
         queryKey: ["team-roles", storeId],
         queryFn: () => fetchWithAccessToken<TeamRole[]>(`/stores/${storeId}/roles`),
         enabled: !!storeId,
     });
 
-export function useTeamMembersQuery(storeId: string) {
+export function useTeamMembersQuery(storeId: string | undefined) {
     return useQuery(teamMembersQueryOptions(storeId));
 }
 
-export function useTeamInvitesQuery(storeId: string) {
+export function useTeamInvitesQuery(storeId: string | undefined) {
     return useQuery(teamInvitesQueryOptions(storeId));
 }
 
-export function useTeamRolesQuery(storeId: string) {
+export function useTeamRolesQuery(storeId: string | undefined) {
     return useQuery(teamRolesQueryOptions(storeId));
 }
 
-export async function createInvite(storeId: string, payload: InvitePayload) {
+export async function createInvite(storeId: string | undefined, payload: InvitePayload) {
     return fetchWithAccessToken<TeamInvite>(`/stores/${storeId}/invites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -107,13 +107,13 @@ export async function createInvite(storeId: string, payload: InvitePayload) {
     });
 }
 
-export async function revokeInvite(storeId: string, inviteId: string) {
+export async function revokeInvite(storeId: string | undefined, inviteId: string) {
     return fetchWithAccessToken<void>(`/stores/${storeId}/invites/${inviteId}`, {
         method: "DELETE",
     });
 }
 
-export async function createRole(storeId: string, payload: CreateRolePayload) {
+export async function createRole(storeId: string | undefined, payload: CreateRolePayload) {
     return fetchWithAccessToken<TeamRole>(`/stores/${storeId}/roles`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,7 +121,7 @@ export async function createRole(storeId: string, payload: CreateRolePayload) {
     });
 }
 
-export async function updateRole(storeId: string, roleId: string, payload: UpdateRolePayload) {
+export async function updateRole(storeId: string | undefined, roleId: string, payload: UpdateRolePayload) {
     return fetchWithAccessToken<TeamRole>(`/stores/${storeId}/roles/${roleId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -129,13 +129,13 @@ export async function updateRole(storeId: string, roleId: string, payload: Updat
     });
 }
 
-export async function deleteRole(storeId: string, roleId: string) {
+export async function deleteRole(storeId: string | undefined, roleId: string) {
     return fetchWithAccessToken<void>(`/stores/${storeId}/roles/${roleId}`, {
         method: "DELETE",
     });
 }
 
-export async function applyMemberRoles(storeId: string, payload: ApplyMemberRolesPayload) {
+export async function applyMemberRoles(storeId: string | undefined, payload: ApplyMemberRolesPayload) {
     return fetchWithAccessToken<{ appliedCount: number }>(`/stores/${storeId}/members/roles/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

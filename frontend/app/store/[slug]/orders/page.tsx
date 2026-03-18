@@ -43,13 +43,13 @@ export default function OrderLookupPage() {
         setLoading(true);
         try {
             const lookup = await api.orders.lookup(store.id, {
-                order_number: normalizedOrder,
+                orderNumber: normalizedOrder,
                 email: normalizedEmail || undefined,
                 phone: normalizedPhone || undefined,
             });
 
-            const access = encodeURIComponent(lookup.order_access_token);
-            router.push(`/store/${slug}/orders/${lookup.order_id}?access=${access}`);
+            const access = encodeURIComponent(lookup.orderAccessToken);
+            router.push(`/store/${slug}/orders/${lookup.orderId}?access=${access}`);
         } catch (err) {
             if (err instanceof ApiError && err.status === 404) {
                 setError("We could not find that order with the provided contact details.");

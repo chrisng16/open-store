@@ -2,27 +2,9 @@
 
 import { api } from "@/lib/api";
 import type { CartItem } from "@/lib/cart-store";
+import { Product, Option } from "@/lib/types";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
-
-type ProductOption = {
-    id: string;
-    name: string;
-    unit_amount: number;
-};
-
-type ProductOptionList = {
-    id: string;
-    options: ProductOption[];
-};
-
-type ProductDetail = {
-    id: string;
-    name: string;
-    image_url: string | null;
-    unit_amount: number;
-    option_lists: ProductOptionList[];
-};
 
 export type PricedCartOption = {
     option_id: string;
@@ -45,9 +27,9 @@ export type PricedCartItem = {
     isPricingLoading?: boolean;
 };
 
-function indexOptionPrices(product: ProductDetail) {
-    const byId = new Map<string, ProductOption>();
-    for (const list of product.option_lists ?? []) {
+function indexOptionPrices(product: Product) {
+    const byId = new Map<string, Option>();
+    for (const list of product.optionLists ?? []) {
         for (const option of list.options ?? []) {
             byId.set(option.id, option);
         }
@@ -73,9 +55,9 @@ export function useCartPricing({
             const queryKey = ["store-product", storeId, productId] as const;
             return {
                 queryKey,
-                queryFn: () => api.products.get(storeId, productId) as Promise<ProductDetail>,
+                queryFn: () => api.products.get(storeId, productId),
                 enabled: !!storeId && !!productId,
-                initialData: () => queryClient.getQueryData<ProductDetail>(queryKey),
+                initialData: () => queryClient.getQueryData<Product>(queryKey),
                 staleTime: 0,
                 refetchOnMount: true,
             };
@@ -90,8 +72,8 @@ export function useCartPricing({
         return map;
     }, [productIds, productQueries]);
 
-    const productsById = useMemo<Record<string, ProductDetail>>(() => {
-        const next: Record<string, ProductDetail> = {};
+    const productsById = useMemo<Record<string, Product>>(() => {
+        const next: Record<string, Product> = {};
         productIds.forEach((productId, index) => {
             const product = productQueries[index]?.data;
             if (product) next[productId] = product;
@@ -130,7 +112,7 @@ export function useCartPricing({
             const optionPriceIndex = indexOptionPrices(product);
             const options: PricedCartOption[] = item.options.map((selected) => {
                 const matched = optionPriceIndex.get(selected.option_id);
-                const unitAmount = matched?.unit_amount ?? 0;
+                const unitAmount = matched?.unitAmount ?? 0;
                 const optionName = matched?.name ?? selected.option_name ?? "Option unavailable";
                 return {
                     option_id: selected.option_id,
@@ -142,15 +124,15 @@ export function useCartPricing({
             });
 
             const optionTotalPerUnit = options.reduce((sum, option) => sum + option.line_total, 0);
-            const lineTotal = (product.unit_amount + optionTotalPerUnit) * item.quantity;
+            const lineTotal = (product.unitAmount + optionTotalPerUnit) * item.quantity;
 
             return {
                 id: item.id,
                 product_id: item.product_id,
                 product_name: product.name,
-                image_url: product.image_url ?? item.image_url ?? null,
+                image_url: product.imageUrl ?? item.image_url ?? null,
                 quantity: item.quantity,
-                unit_amount: product.unit_amount,
+                unit_amount: product.unitAmount,
                 options,
                 line_total: lineTotal,
                 isPricingLoading,

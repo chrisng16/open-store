@@ -4,7 +4,8 @@ import { StoreEditForm, StoreEditFormHandle } from "@/components/dashboard/store
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
-import { Store, useStoreOnboardingStatusQuery } from "@/queries/stores";
+import { Store } from "@/lib/types";
+import { useStoreOnboardingStatusQuery } from "@/queries/stores";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
@@ -38,7 +39,7 @@ export default function StoreOverviewPage({ params }: StoreOverviewPageProps) {
         return (
             <div className="flex h-full min-h-0 flex-col overflow-hidden">
                 <div className="shrink-0">
-                    <StoreSubNav pending={isPending} storeId={storeId} storeName={store?.name} storeSlug={store?.slug} />
+                    <StoreSubNav pending={isPending} store={store} />
                 </div>
                 {contentSkeleton}
             </div>
@@ -52,7 +53,7 @@ export default function StoreOverviewPage({ params }: StoreOverviewPageProps) {
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
             <div className="shrink-0">
-                <StoreSubNav pending={isPending} storeId={storeId} storeName={store?.name} storeSlug={store?.slug} />
+                <StoreSubNav pending={isPending} store={store} />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
                 <StoreEditForm

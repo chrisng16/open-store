@@ -195,7 +195,7 @@ class AIWorkerSettings:
     """
     Worker for AI-heavy menu import jobs.
 
-    Scale this horizontally — run 2–4 replicas to reduce queue wait time:
+    Scale this horizontally — run 2-4 replicas to reduce queue wait time:
 
         arq app.worker.AIWorkerSettings   # replica 1
         arq app.worker.AIWorkerSettings   # replica 2

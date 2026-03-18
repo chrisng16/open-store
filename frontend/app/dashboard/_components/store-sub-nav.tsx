@@ -1,29 +1,23 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
+import { type Store } from "@/lib/types";
 import { useTeamMembersQuery } from "@/queries/team";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart2, CreditCard, ExternalLink, FileUp, Package, ShoppingBag, Zap } from "lucide-react";
+import { BarChart2, CreditCard, ExternalLink, FileUp, Package, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
+import { StoreActiveToggle } from "./store-active-toggle";
 
 interface StoreSubNavProps {
-    storeId: string;
-    storeName: string | undefined;
-    storeSlug: string | undefined;
+    store?: Store;
     pending: boolean;
 }
 
-export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: StoreSubNavProps) {
-    const membersQuery = useTeamMembersQuery(storeId);
+export default function StoreSubNav({ pending, store }: StoreSubNavProps) {
+    const membersQuery = useTeamMembersQuery(store?.id);
     const currentUserIdQuery = useQuery({
         queryKey: ["current-user-id"],
         queryFn: async () => {
@@ -44,12 +38,12 @@ export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: 
     }, [currentUserIdQuery.data, membersQuery.data]);
 
     const navItems = [
-        { href: `/dashboard/${storeId}/orders`, label: "Orders", icon: ShoppingBag },
-        { href: `/dashboard/${storeId}/products`, label: "Products", icon: Package },
-        { href: `/dashboard/${storeId}/ai-import`, label: "AI Import", icon: FileUp },
-        { href: `/dashboard/${storeId}/analytics`, label: "Analytics", icon: BarChart2 },
+        { href: `/dashboard/${store?.id}/orders`, label: "Orders", icon: ShoppingBag },
+        { href: `/dashboard/${store?.id}/products`, label: "Products", icon: Package },
+        { href: `/dashboard/${store?.id}/ai-import`, label: "AI Import", icon: FileUp },
+        { href: `/dashboard/${store?.id}/analytics`, label: "Analytics", icon: BarChart2 },
         ...(isOwner
-            ? [{ href: `/dashboard/${storeId}/payments`, label: "Payments", icon: CreditCard }]
+            ? [{ href: `/dashboard/${store?.id}/payments`, label: "Payments", icon: CreditCard }]
             : []),
     ];
     return (
@@ -57,17 +51,29 @@ export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: 
             <div className="flex items-center justify-between px-6 py-3">
                 <div className="flex flex-col">
                     {
-                        pending ? <Skeleton className="h-4 w-32" /> : <h1 className="text-base font-semibold">{storeName || "Store"}</h1>
+                        pending ?
+                            <div className="flex items-center gap-1">
+                                <span className="size-3 bg-accent animate-pulse rounded-full"></span>
+                                <Skeleton className="h-4 w-32" />
+                            </div> :
+                            <div className="flex items-center gap-1">
+                                <span className={cn(`size-2.5 rounded-full`, store?.isActive ? "bg-emerald-500" : "bg-red-500")}></span>
+                                <h1 className="text-base font-semibold">{store?.name || "Store"}</h1>
+                            </div>
                     }
                     <Link
-                        href={`/store/${storeSlug}/`}
+                        href={`/store/${store?.slug}/`}
                         target="_blank"
                         className="text-xs text-muted-foreground hover:text-foreground flex items-center"
                     >
                         View Store <ExternalLink className="ml-1 h-3 w-3" />
                     </Link>
                 </div>
-                <div className="flex items-center gap-1">
+                {/* Store Active Toggle (Owner only) */}
+                {!pending && isOwner && (
+                    <StoreActiveToggle store={store} />
+                )}
+                {/* <div className="flex items-center gap-1">
                     <div className="hidden sm:flex md:hidden lg:flex gap-1">
                         {navItems.map((item) => (
                             <Link key={item.href} href={item.href}>
@@ -99,7 +105,7 @@ export default function StoreSubNav({ storeId, storeName, pending, storeSlug }: 
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
-                </div>
+                </div> */}
             </div>
         </div>
     )
