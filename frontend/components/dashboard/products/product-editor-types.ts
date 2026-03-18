@@ -4,6 +4,7 @@ export type ProductCategoryOption = {
 };
 
 export type ProductOptionFormData = {
+    id?: string;
     name: string;
     unitAmount: string;
     isDefault: boolean;
@@ -11,6 +12,7 @@ export type ProductOptionFormData = {
 };
 
 export type ProductOptionListFormData = {
+    id?: string;
     name: string;
     minNumOptions: number;
     maxNumOptions: number;

@@ -154,6 +154,7 @@ export function StockManagementDialogHost() {
                         imageUrl: formData.imageUrl || null,
                         categoryId: resolvedCategoryId,
                         optionLists: formData.optionLists.map((optionList, optionListIndex) => ({
+                            id: optionList.id,
                             name: optionList.name.trim(),
                             selectionNode: optionList.maxNumOptions === 1 ? "single_select" : "multi_select",
                             minNumOptions: optionList.minNumOptions,
@@ -163,6 +164,7 @@ export function StockManagementDialogHost() {
                             isOptional: optionList.isOptional,
                             sortOrder: optionListIndex,
                             options: optionList.options.map((option, index) => ({
+                                id: option.id,
                                 name: option.name.trim(),
                                 unitAmount: Math.round(Number(option.unitAmount || 0) * 100),
                                 currency: "USD",

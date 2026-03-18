@@ -18,7 +18,7 @@ export default function CartPage() {
     const params = useParams<{ slug: string }>();
     const slug = params.slug;
     const store = useStore();
-    const { items } = useCartSummary();
+    const { items } = useCartSummary(slug);
     const { removeItem, updateQuantity, updateItem } = useCartMutations();
     const { pricedItems, subtotal, tax, total, isLoading, error } = useCartPricing({
         storeId: store.id,

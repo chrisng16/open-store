@@ -161,6 +161,23 @@ export default function MenuEditorPage({
     const pageCount = data?.productsPage.pageCount ?? 1;
     const totalProducts = data?.productsPage.total ?? 0;
 
+    const updateProductStatusMutation = useMutation({
+        mutationFn: async ({ productId, isActive }: { productId: string; isActive: boolean }) => {
+            await fetchWithAccessToken<void>(`/stores/${storeId}/products/${productId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: isActive }),
+            });
+        },
+        onSuccess: () => {
+            toast.success("Product status updated");
+            void refetch();
+        },
+        onError: (error) => {
+            toast.error(error instanceof Error ? error.message : "Failed to update product status");
+        },
+    });
+
     const deleteProductMutation = useMutation({
         mutationFn: async (productId: string) => {
             await fetchWithAccessToken<void>(`/stores/${storeId}/products/${productId}`, {
@@ -238,8 +255,14 @@ export default function MenuEditorPage({
                 onDelete: (product) => {
                     setProductToDelete(product);
                 },
+                onStatusToggle: async (product, isActive) => {
+                    await updateProductStatusMutation.mutateAsync({
+                        productId: product.id,
+                        isActive,
+                    });
+                },
             }),
-        [openProductEdit, queryClient, storeId]
+        [openProductEdit, queryClient, storeId, updateProductStatusMutation]
     );
 
     async function handleDeleteProduct() {

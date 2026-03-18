@@ -33,6 +33,7 @@ class CategoryResponse(BaseModel):
 
 
 class OptionCreate(BaseModel):
+    id: uuid.UUID | None = None
     name: str = Field(..., min_length=1, max_length=255)
     unit_amount: int = Field(default=0, ge=0)
     currency: str = Field(default="USD", min_length=3, max_length=3)
@@ -61,6 +62,7 @@ class OptionResponse(BaseModel):
 
 
 class OptionListCreate(BaseModel):
+    id: uuid.UUID | None = None
     name: str = Field(..., min_length=1, max_length=255)
     selection_node: str = Field(default="multi_select")
     min_num_options: int = Field(default=0, ge=0)
@@ -157,6 +159,7 @@ class ProductListItemResponse(BaseModel):
     dietary_tags: list[str] | None
     allergens: list[str] | None
     ingredients: str | None
+    option_lists: list[OptionListResponse] = []
     created_at: datetime
     updated_at: datetime
 

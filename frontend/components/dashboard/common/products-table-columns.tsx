@@ -3,9 +3,21 @@
 import { DataTableColumnHeader } from "@/components/dashboard/common/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 export type ProductCategoryOption = {
     id: string;
@@ -40,13 +52,74 @@ export type ProductRow = {
 type ProductsColumnsParams = {
     onEdit: (product: ProductRow) => void;
     onDelete: (product: ProductRow) => void;
+    onStatusToggle: (product: ProductRow, isActive: boolean) => Promise<void>;
 };
+
+function StatusToggle({
+    isActive,
+    onToggle,
+    disabled = false
+}: {
+    isActive: boolean;
+    onToggle: (val: boolean) => Promise<void>;
+    disabled?: boolean;
+}) {
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    const handleToggle = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isUpdating || disabled) return;
+
+        setIsUpdating(true);
+        try {
+            await onToggle(!isActive);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    return (
+        <Tooltip delayDuration={400}>
+            <TooltipTrigger asChild>
+                <button
+                    onClick={handleToggle}
+                    disabled={isUpdating || disabled}
+                    className={cn(
+                        "relative inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all duration-300 select-none cursor-pointer",
+                        "border shadow-xs active:scale-95 disabled:opacity-70 disabled:scale-100",
+                        isActive
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                            : "bg-muted/40 border-muted-foreground/20 text-muted-foreground hover:bg-muted/60"
+                    )}
+                >
+                    <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center">
+                        {isActive && !isUpdating && (
+                            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        )}
+                        {!isUpdating ? (
+                            <span className={cn(
+                                "relative inline-flex h-1.5 w-1.5 rounded-full",
+                                isActive ? "bg-emerald-500" : "bg-muted-foreground/50",
+                            )} />
+                        ) : (
+                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        )}
+                    </span>
+                    <span className="leading-none">{isActive ? "Active" : "Hidden"}</span>
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-[11px] font-medium px-2 py-1">
+                {isActive ? "Click to hide from customers" : "Click to make visible to customers"}
+            </TooltipContent>
+        </Tooltip>
+    );
+}
 
 export function getProductsTableColumns({
     onEdit,
     onDelete,
+    onStatusToggle,
 }: ProductsColumnsParams): ColumnDef<ProductRow>[] {
-
     return [
         {
             accessorKey: "name",
@@ -69,6 +142,56 @@ export function getProductsTableColumns({
             cell: ({ row }) => row.original.category?.name ?? "—",
         },
         {
+            id: "options",
+            header: ({ column }) => (
+                <DataTableColumnHeader column={column} title="Options" />
+            ),
+            cell: ({ row }) => {
+                const lists = row.original.optionLists ?? [];
+                if (lists.length === 0)
+                    return (
+                        <span className="text-muted-foreground text-[11px] italic">
+                            No options
+                        </span>
+                    );
+
+                return (
+                    <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                            <div className="flex items-center cursor-default py-1 group w-fit">
+                                <Badge
+                                    className="h-5 px-1.5 text-[11px] leading-none"
+                                >
+                                    {lists.length} {lists.length === 1 ? "Group" : "Groups"}
+                                </Badge>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                            align="center"
+                            className="px-3 py-2 text-xs"
+                        >
+                            <div className="space-y-1">
+                                <p className="font-semibold text-[11px] text-muted uppercase tracking-wider">
+                                    Option Groups
+                                </p>
+                                <ul className="list-disc pl-3 space-y-0">
+                                    {lists.map((list) => (
+                                        <li key={list.name} className="font-medium text-background">
+                                            {list.name}
+                                            <span className="ml-1 text-muted text-[10px] font-normal">
+                                                ({list.options?.length ?? 0}{" "}
+                                                {list.options?.length === 1 ? "option" : "options"})
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </TooltipContent>
+                    </Tooltip>
+                );
+            },
+        },
+        {
             accessorKey: "unitAmount",
             size: 90,
             minSize: 80,
@@ -79,7 +202,9 @@ export function getProductsTableColumns({
                 </div>
             ),
             cell: ({ row }) => (
-                <div className="text-left">${(Number(row.original.unitAmount) / 100).toFixed(2)}</div>
+                <div className="text-left">
+                    ${(Number(row.original.unitAmount) / 100).toFixed(2)}
+                </div>
             ),
         },
         {
@@ -94,25 +219,23 @@ export function getProductsTableColumns({
             ),
             cell: ({ row }) => (
                 <div className="text-left">
-                    <Badge
-                        variant={row.original.isActive ? "default" : "secondary"}
-                        className="h-5 px-1.5 text-[11px] leading-none"
-                    >
-                        {row.original.isActive ? "Active" : "Hidden"}
-                    </Badge>
+                    <StatusToggle
+                        isActive={row.original.isActive}
+                        onToggle={(val) => onStatusToggle(row.original, val)}
+                    />
                 </div>
             ),
         },
         {
             id: "actions",
-            header: () => <div className="text-right">Actions</div>,
+            header: () => <div className="text-right mr-6">Actions</div>,
             size: 90,
             minSize: 80,
             maxSize: 90,
             enableHiding: false,
             enableSorting: false,
             cell: ({ row }) => (
-                <div className="flex items-center justify-end gap-1">
+                <div className="flex items-center justify-end gap-1 mr-3">
                     <div className="lg:hidden">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -121,10 +244,7 @@ export function getProductsTableColumns({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="min-w-30">
-                                <DropdownMenuItem
-                                    key="edit"
-                                    onSelect={() => onEdit(row.original)}
-                                >
+                                <DropdownMenuItem key="edit" onSelect={() => onEdit(row.original)}>
                                     <Pencil className="h-4 w-4" /> Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
@@ -139,17 +259,18 @@ export function getProductsTableColumns({
                     </div>
                     <div className="hidden lg:flex items-center gap-1">
                         <Button
-                            variant={'ghost'}
-                            size={'icon-sm'}
+                            variant={"ghost"}
+                            size={"icon-sm"}
                             onClick={() => onEdit(row.original)}
                         >
                             <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
-                            variant={'ghost'}
-                            size={'icon-sm'}
+                            variant={"ghost"}
+                            size={"icon-sm"}
                             onClick={() => onDelete(row.original)}
-                            className="text-destructive focus:text-destructive">
+                            className="text-destructive focus:text-destructive"
+                        >
                             <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                     </div>

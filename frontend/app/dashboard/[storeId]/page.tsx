@@ -7,6 +7,7 @@ import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { Store } from "@/lib/types";
 import { useStoreOnboardingStatusQuery } from "@/queries/stores";
 import { useQuery } from "@tanstack/react-query";
+import { AlertCircle, CheckCircle2, Loader2, Save, Undo2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
 import StoreSubNav from "../_components/store-sub-nav";
@@ -65,22 +66,47 @@ export default function StoreOverviewPage({ params }: StoreOverviewPageProps) {
                 />
             </div>
             <div className="shrink-0 rounded-b-md border-t bg-background-elevated/70 backdrop-blur">
-                <div className="mx-auto flex w-full max-w-4xl items-center justify-end gap-2 p-4 py-3">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => formRef.current?.reset()}
-                        disabled={formState.isSubmitting}
-                    >
-                        Reset
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={() => formRef.current?.submit()}
-                        disabled={!formState.isDirty || formState.isSubmitting}
-                    >
-                        {formState.isSubmitting ? "Saving..." : "Save Changes"}
-                    </Button>
+                <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 p-4 py-3">
+                    <div className="flex flex-col">
+                        {formState.isDirty ? (
+                            <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                <AlertCircle className="size-3" />
+                                Unsaved changes
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                <CheckCircle2 className="size-3" />
+                                All changes saved
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-full text-xs"
+                            onClick={() => formRef.current?.reset()}
+                            disabled={!formState.isDirty || formState.isSubmitting}
+                        >
+                            <Undo2 className="mr-1.5 size-3.5" />
+                            Reset
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="rounded-full px-6 text-xs font-semibold"
+                            onClick={() => formRef.current?.submit()}
+                            disabled={!formState.isDirty || formState.isSubmitting}
+                        >
+                            {formState.isSubmitting ? (
+                                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                            ) : (
+                                <Save className="mr-1.5 size-3.5" />
+                            )}
+                            Save Changes
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>

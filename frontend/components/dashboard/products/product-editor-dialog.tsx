@@ -32,11 +32,13 @@ type ProductDetailResponse = {
     imageUrl?: string | null;
     categoryId: string | null;
     optionLists?: {
+        id: string;
         name: string;
         minNumOptions: number;
         maxNumOptions: number;
         isOptional: boolean;
         options: {
+            id: string;
             name: string;
             unitAmount: number;
             isDefault: boolean;
@@ -106,11 +108,13 @@ export function ProductEditorDialog({
             categoryId: productDetail.categoryId ?? "",
             categoryName: selectedCategoryName,
             optionLists: (productDetail.optionLists ?? []).map((group) => ({
+                id: group.id,
                 name: group.name,
                 minNumOptions: group.minNumOptions,
                 maxNumOptions: group.maxNumOptions,
                 isOptional: group.isOptional,
                 options: group.options.map((option) => ({
+                    id: option.id,
                     name: option.name,
                     unitAmount: String((option.unitAmount ?? 0) / 100),
                     isDefault: option.isDefault,

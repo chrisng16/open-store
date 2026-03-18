@@ -33,7 +33,7 @@ export function CartButton({
     ...props
 }: { slug: string; storeId: string } & React.ComponentProps<typeof Button>) {
     const isHydrated = useCartHydrated();
-    const { items, itemCount } = useCartSummary();
+    const { items, itemCount } = useCartSummary(slug);
     const { updateQuantity, removeItem, updateItem } = useCartMutations();
 
     const safeItemCount = isHydrated ? itemCount : 0;

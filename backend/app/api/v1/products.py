@@ -214,7 +214,10 @@ async def list_products(
 
     result = await db.execute(
         filtered_query
-        .options(selectinload(Product.category))
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.option_lists).selectinload(OptionList.options)
+        )
         .order_by(sort_expression, tie_breaker)
         .limit(window.page_size)
         .offset(window.offset)
@@ -323,37 +326,67 @@ async def update_product(
         setattr(product, field, value)
 
     if data.option_lists is not None:
-        product.option_lists.clear()
-        await db.flush()
+        # 1. Map existing option lists by ID for easy lookup
+        existing_ol_map = {ol.id: ol for ol in product.option_lists}
+        incoming_ol_ids = {ol_data.id for ol_data in data.option_lists if ol_data.id}
 
+        # 2. Remove option lists that are not in the incoming data
+        for ol_id in list(existing_ol_map.keys()):
+            if ol_id not in incoming_ol_ids:
+                # This will also delete orphan options due to cascade="all, delete-orphan"
+                product.option_lists.remove(existing_ol_map[ol_id])
+
+        # 3. Process incoming option lists
         for ol_data in data.option_lists:
-            ol = OptionList(
-                product_id=product.id,
-                name=ol_data.name,
-                selection_node=ol_data.selection_node,
-                min_num_options=ol_data.min_num_options,
-                max_num_options=ol_data.max_num_options,
-                min_aggregate_options_quantity=ol_data.min_aggregate_options_quantity,
-                max_aggregate_options_quantity=ol_data.max_aggregate_options_quantity,
-                is_optional=ol_data.is_optional,
-                sort_order=ol_data.sort_order,
-            )
-            product.option_lists.append(ol)
-
-            for option_data in ol_data.options:
-                ol.options.append(
-                    Option(
-                        name=option_data.name,
-                        unit_amount=option_data.unit_amount,
-                        currency=option_data.currency,
-                        decimal_places=option_data.decimal_places,
-                        min_option_choice_quantity=option_data.min_option_choice_quantity,
-                        max_option_choice_quantity=option_data.max_option_choice_quantity,
-                        default_quantity=option_data.default_quantity,
-                        is_default=option_data.is_default,
-                        sort_order=option_data.sort_order,
-                    )
+            if ol_data.id and ol_data.id in existing_ol_map:
+                # Update existing option list
+                ol = existing_ol_map[ol_data.id]
+                for field, value in ol_data.model_dump(exclude_unset=True, exclude={"id", "options"}).items():
+                    setattr(ol, field, value)
+            else:
+                # Create new option list
+                ol = OptionList(
+                    product_id=product.id,
+                    name=ol_data.name,
+                    selection_node=ol_data.selection_node,
+                    min_num_options=ol_data.min_num_options,
+                    max_num_options=ol_data.max_num_options,
+                    min_aggregate_options_quantity=ol_data.min_aggregate_options_quantity,
+                    max_aggregate_options_quantity=ol_data.max_aggregate_options_quantity,
+                    is_optional=ol_data.is_optional,
+                    sort_order=ol_data.sort_order,
                 )
+                product.option_lists.append(ol)
+
+            # 4. Process options for this list (same merge logic)
+            existing_opt_map = {opt.id: opt for opt in ol.options}
+            incoming_opt_ids = {opt_data.id for opt_data in ol_data.options if opt_data.id}
+
+            # Remove options not in incoming data
+            for opt_id in list(existing_opt_map.keys()):
+                if opt_id not in incoming_opt_ids:
+                    ol.options.remove(existing_opt_map[opt_id])
+
+            # Update or create options
+            for opt_data in ol_data.options:
+                if opt_data.id and opt_data.id in existing_opt_map:
+                    opt = existing_opt_map[opt_data.id]
+                    for field, value in opt_data.model_dump(exclude_unset=True, exclude={"id"}).items():
+                        setattr(opt, field, value)
+                else:
+                    ol.options.append(
+                        Option(
+                            name=opt_data.name,
+                            unit_amount=opt_data.unit_amount,
+                            currency=opt_data.currency,
+                            decimal_places=opt_data.decimal_places,
+                            min_option_choice_quantity=opt_data.min_option_choice_quantity,
+                            max_option_choice_quantity=opt_data.max_option_choice_quantity,
+                            default_quantity=opt_data.default_quantity,
+                            is_default=opt_data.is_default,
+                            sort_order=opt_data.sort_order,
+                        )
+                    )
 
     await db.flush()
     await db.refresh(product, attribute_names=["updated_at"])

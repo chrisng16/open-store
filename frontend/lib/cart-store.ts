@@ -171,12 +171,18 @@ export function useCartHydrated() {
     );
 }
 
-export function useCartSummary() {
+const EMPTY_ITEMS: CartItem[] = [];
+
+export function useCartSummary(slug?: string) {
     return useCartStore(
-        useShallow((state) => ({
-            items: state.items,
-            itemCount: getCartItemCount(state.items),
-        }))
+        useShallow((state) => {
+            const items = (slug && state.storeSlug !== slug) ? EMPTY_ITEMS : state.items;
+            return {
+                items,
+                itemCount: getCartItemCount(items),
+                storeSlug: state.storeSlug,
+            };
+        })
     );
 }
 

@@ -2,7 +2,6 @@
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
 import { type Store } from "@/lib/types";
 import { useTeamMembersQuery } from "@/queries/team";
 import { useQuery } from "@tanstack/react-query";
@@ -51,15 +50,7 @@ export default function StoreSubNav({ pending, store }: StoreSubNavProps) {
             <div className="flex items-center justify-between px-6 py-3">
                 <div className="flex flex-col">
                     {
-                        pending ?
-                            <div className="flex items-center gap-1">
-                                <span className="size-3 bg-accent animate-pulse rounded-full"></span>
-                                <Skeleton className="h-4 w-32" />
-                            </div> :
-                            <div className="flex items-center gap-1">
-                                <span className={cn(`size-2.5 rounded-full`, store?.isActive ? "bg-emerald-500" : "bg-red-500")}></span>
-                                <h1 className="text-base font-semibold">{store?.name || "Store"}</h1>
-                            </div>
+                        pending ? <Skeleton className="h-4 w-32" /> : <h1 className="text-base font-semibold">{store?.name || "Store"}</h1>
                     }
                     <Link
                         href={`/store/${store?.slug}/`}
