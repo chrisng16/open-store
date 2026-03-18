@@ -135,7 +135,7 @@ export type CategoryResponse = {
     /**
      * Description
      */
-    description: string | null;
+    description: string | undefined;
     /**
      * Sort Order
      */
@@ -1190,7 +1190,7 @@ export type ProductWithCategoryListItemResponse = {
     /**
      * Category Id
      */
-    categoryId: string | null;
+    categoryId: string | undefined;
     /**
      * Name
      */
@@ -1198,7 +1198,7 @@ export type ProductWithCategoryListItemResponse = {
     /**
      * Description
      */
-    description: string | null;
+    description: string | undefined;
     /**
      * Unit Amount
      */

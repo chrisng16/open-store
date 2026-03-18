@@ -36,7 +36,7 @@ export default function StoreFooter() {
                         <div className="space-y-5">
                             <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/90 px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
                                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--store-accent)" }} />
-                                {store.is_active ? "Open for pickup" : "Ordering paused"}
+                                {store.isActive ? "Open for pickup" : "Ordering paused"}
                             </div>
 
                             <div className="max-w-2xl space-y-3">

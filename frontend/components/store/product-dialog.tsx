@@ -16,7 +16,7 @@ import { Minus, Plus } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Product, OptionList } from "@/lib/types";
+import { OptionList, Product } from "@/lib/types";
 
 type Selections = Record<string, Record<string, number>>;
 
@@ -458,10 +458,8 @@ export function ProductDialog({
                                     canIncrement
                                 />
                                 <Button
-                                    className={cn(
-                                        "flex-1 rounded-full font-bold",
-                                        allSatisfied ? "" : "bg-muted text-muted-foreground"
-                                    )}
+                                    variant={allSatisfied ? "default" : "secondary"}
+                                    className="flex-1 rounded-full font-bold shadow-sm"
                                     disabled={!allSatisfied}
                                     onClick={handleAdd}
                                 >

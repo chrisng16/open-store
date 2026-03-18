@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { useMenuScrollSpy } from "@/hooks/use-menu-scroll-spy";
 import { useCartMutations } from "@/lib/cart-store";
-import { Product } from "@/lib/types";
+import { Product, ProductWithCategoryListItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useStorefrontProductDialogState } from "@/stores/ui-store";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -31,7 +31,7 @@ type OptionList = {
     options: Option[];
 };
 
-type CategorySection = { id: string; name: string; description: string | null; products: Product[] };
+type CategorySection = { id: string; name: string; description: string | null; products: (ProductWithCategoryListItem)[] };
 
 const DIETARY_ICONS: Record<string, string> = {
     vegan: "🌱", vegetarian: "🥬", "gluten-free": "🌾",
@@ -136,12 +136,16 @@ function TabBar({
 export function MenuBrowser({
     storeId, slug, storeName, storeDescription, sections, defaultCategory,
     navbarHeight = 64,
+    bannerUrl,
+    accentColor,
 }: {
     storeId: string;
     slug: string; storeName: string; storeDescription?: string | null;
     sections: CategorySection[]; defaultCategory: string;
     /** Height of the global navbar in px. Used to offset the sticky header. Defaults to 80. */
     navbarHeight?: number;
+    bannerUrl?: string | null;
+    accentColor?: unknown;
 }) {
     // Ref for the full inline store-info block (not sticky).
     const storeInfoRef = useRef<HTMLDivElement | null>(null);
@@ -240,16 +244,30 @@ export function MenuBrowser({
             />
 
             {/* ── Inline store info (not sticky, scrolls away) ── */}
-            <div ref={storeInfoRef} className="flex flex-wrap items-start border border-border/70 justify-between gap-4 p-6 bg-card rounded-2xl mb-6">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight md:text-3xl">{storeName}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {storeDescription || "Playful bites, crafted fast for pickup."}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge variant="secondary">Pickup only</Badge>
-                        <Badge variant="outline">{totalItems} items</Badge>
-                        <Badge variant="outline">Ready in 15-25 min</Badge>
+            <div ref={storeInfoRef} className="overflow-hidden border border-border/70 bg-card rounded-2xl mb-6 shadow-sm">
+                {bannerUrl ? (
+                    <div className="h-48 w-full overflow-hidden md:h-64">
+                        <img
+                            src={bannerUrl}
+                            alt={storeName}
+                            className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
+                        />
+                    </div>
+                ) : (
+                    <div className="h-24 w-full bg-linear-to-br from-muted/50 to-muted md:h-32" />
+                )}
+
+                <div className="flex flex-wrap items-start justify-between gap-4 p-6 md:p-8">
+                    <div className="space-y-2">
+                        <h2 className="text-2xl font-bold tracking-tight md:text-4xl">{storeName}</h2>
+                        <p className="max-w-2xl text-sm text-muted-foreground md:text-base leading-relaxed">
+                            {storeDescription || "Playful bites, crafted fast for pickup."}
+                        </p>
+                        <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <Badge variant="secondary">Pickup only</Badge>
+                            <Badge variant="outline" className="font-medium">{totalItems} items</Badge>
+                            <Badge variant="outline" className="font-medium text-emerald-600 border-emerald-500/20 bg-emerald-500/5">Ready in 15-25 min</Badge>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -345,13 +363,13 @@ function ProductCard({
                             alt={product.name}
                             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
-                        <div className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-background shadow">
+                        <div className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
                             <Plus className="h-3.5 w-3.5" />
                         </div>
                     </div>
                 ) : (
                     <div className="flex shrink-0 items-end">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
                             <Plus className="h-3.5 w-3.5" />
                         </div>
                     </div>

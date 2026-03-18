@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { StoreData } from '@/lib/store-context';
 import { Phone } from 'lucide-react';
 import Link from 'next/link';
+import { StoreThemeToggle } from './store-theme-toggle';
 
 export default function StoreHeader({ store, slug }: { store: StoreData; slug: string }) {
 
@@ -11,9 +12,9 @@ export default function StoreHeader({ store, slug }: { store: StoreData; slug: s
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex gap-3 py-3 flex-row items-center justify-between">
                     <Link href={`/store/${slug}`} className="flex min-w-0 items-center gap-4">
-                        {store.logo_url && (
+                        {store.logoUrl && (
                             <img
-                                src={store.logo_url}
+                                src={store.logoUrl}
                                 alt={store.name}
                                 className="h-12 w-12 rounded-2xl border border-border/70 object-cover"
                             />
@@ -34,25 +35,25 @@ export default function StoreHeader({ store, slug }: { store: StoreData; slug: s
                             {store.phone && (
                                 <Link href={`tel:${store.phone}`}>
                                     <Button variant="outline" size="sm" className="rounded-full px-4">
-                                        <Phone />Call store
+                                        <Phone className="size-3.5 mr-1.5" />Call
                                     </Button>
                                 </Link>
                             )}
                             <Link href={`/store/${slug}/checkout`}>
-                                <Button variant="outline" size="sm" className="rounded-full border border-transparent px-4 hover:border-border/80 hover:bg-card">
+                                <Button variant="default" size="sm" className="rounded-full px-4 shadow-sm">
                                     Checkout
                                 </Button>
                             </Link>
                             <Link href={`/store/${slug}/orders`}>
-                                <Button variant="outline" size="sm" className="rounded-full border border-transparent px-4 hover:border-border/80 hover:bg-card">
+                                <Button variant="outline" size="sm" className="rounded-full px-4 border-border/50">
                                     Track order
                                 </Button>
                             </Link>
                         </nav>
 
-                        <div className="flex flex-wrap items-center gap-2">
-
-                            <CartButton slug={slug} storeId={store.id} size={'sm'} />
+                        <div className="flex flex-wrap items-center gap-2 ml-2">
+                            <StoreThemeToggle />
+                            <CartButton slug={slug} storeId={store.id} size={'sm'} className="rounded-full" />
                         </div>
                     </div>
                 </div>

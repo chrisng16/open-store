@@ -1,6 +1,7 @@
 "use client";
 
 import { StoreEditForm, StoreEditFormHandle } from "@/components/dashboard/store/store-edit-form";
+import { StorefrontCustomizationForm, StorefrontCustomizationFormHandle } from "@/components/dashboard/store/storefront-customization-form";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
@@ -8,19 +9,32 @@ import { Store } from "@/lib/types";
 import { useStoreOnboardingStatusQuery } from "@/queries/stores";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Loader2, Save, Undo2 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { use, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { use, useEffect, useRef, useState, Suspense } from "react";
 import StoreSubNav from "../_components/store-sub-nav";
 
 interface StoreOverviewPageProps {
     params: Promise<{ storeId: string }>;
 }
 
-export default function StoreOverviewPage({ params }: StoreOverviewPageProps) {
+export default function StoreOverviewPage(props: StoreOverviewPageProps) {
+    return (
+        <Suspense fallback={<div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-muted-foreground" /></div>}>
+            <StoreOverviewContent {...props} />
+        </Suspense>
+    );
+}
+
+function StoreOverviewContent({ params }: StoreOverviewPageProps) {
     const { storeId } = use(params)
     const router = useRouter();
-    const formRef = useRef<StoreEditFormHandle>(null);
+    const searchParams = useSearchParams();
+    const currentTab = searchParams.get("tab") === "appearance" ? "appearance" : "general";
+    
+    const generalFormRef = useRef<StoreEditFormHandle>(null);
+    const appearanceFormRef = useRef<StorefrontCustomizationFormHandle>(null);
     const [formState, setFormState] = useState({ isDirty: false, isSubmitting: false });
+    
     const { data: onboardingStatus, isPending: onboardingPending } =
         useStoreOnboardingStatusQuery(storeId);
 
@@ -35,6 +49,11 @@ export default function StoreOverviewPage({ params }: StoreOverviewPageProps) {
             router.replace(`/dashboard/${storeId}/onboarding`);
         }
     }, [onboardingPending, onboardingStatus, router, storeId]);
+
+    // Reset form state when switching tabs
+    useEffect(() => {
+        setFormState({ isDirty: false, isSubmitting: false });
+    }, [currentTab]);
 
     if (isPending || onboardingPending) {
         return (
@@ -51,19 +70,52 @@ export default function StoreOverviewPage({ params }: StoreOverviewPageProps) {
         return <div className="p-6">Store not found.</div>
     }
 
+    const handleSave = () => {
+        if (currentTab === "appearance") {
+            appearanceFormRef.current?.submit();
+        } else {
+            generalFormRef.current?.submit();
+        }
+    };
+
+    const handleReset = () => {
+        if (currentTab === "appearance") {
+            appearanceFormRef.current?.reset();
+        } else {
+            generalFormRef.current?.reset();
+        }
+    };
+
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
             <div className="shrink-0">
                 <StoreSubNav pending={isPending} store={store} />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-                <StoreEditForm
-                    ref={formRef}
-                    store={store}
-                    mode="edit"
-                    onSuccess={() => refetch()}
-                    onStateChange={setFormState}
-                />
+                <div className="mx-auto w-full max-w-4xl pb-4">
+                    <h2 className="text-xl font-semibold tracking-tight">
+                        {currentTab === "appearance" ? "Storefront Customization" : "General Settings"}
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        {currentTab === "appearance" ? "Design the look and feel of your public store." : "Manage your store's core details and business hours."}
+                    </p>
+                </div>
+                {currentTab === "appearance" ? (
+                    <StorefrontCustomizationForm
+                        ref={appearanceFormRef}
+                        store={store}
+                        onSuccess={() => refetch()}
+                        onStateChange={setFormState}
+                    />
+                ) : (
+                    <StoreEditForm
+                        ref={generalFormRef}
+                        store={store}
+                        mode="edit"
+                        onSuccess={() => refetch()}
+                        onStateChange={setFormState}
+                    />
+                )}
             </div>
             <div className="shrink-0 rounded-b-md border-t bg-background-elevated/70 backdrop-blur">
                 <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 p-4 py-3">
@@ -86,7 +138,7 @@ export default function StoreOverviewPage({ params }: StoreOverviewPageProps) {
                             variant="ghost"
                             size="sm"
                             className="rounded-full text-xs"
-                            onClick={() => formRef.current?.reset()}
+                            onClick={handleReset}
                             disabled={!formState.isDirty || formState.isSubmitting}
                         >
                             <Undo2 className="mr-1.5 size-3.5" />
@@ -96,7 +148,7 @@ export default function StoreOverviewPage({ params }: StoreOverviewPageProps) {
                             type="button"
                             size="sm"
                             className="rounded-full px-6 text-xs font-semibold"
-                            onClick={() => formRef.current?.submit()}
+                            onClick={handleSave}
                             disabled={!formState.isDirty || formState.isSubmitting}
                         >
                             {formState.isSubmitting ? (

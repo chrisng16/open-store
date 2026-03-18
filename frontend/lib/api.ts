@@ -1,5 +1,6 @@
 import * as sdk from "./api-generated";
 import { denormalizeRequest, normalizeResponse } from "./normalize-response";
+import * as T from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -66,79 +67,79 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
 export const api = {
     stores: {
         create: (data: sdk.StoreCreate, token: string) =>
-            apiRequest<sdk.StoreResponse>("/stores", { method: "POST", body: data, token }),
+            apiRequest<T.Store>("/stores", { method: "POST", body: data, token }),
         getBySlug: (slug: string) =>
-            apiRequest<sdk.StorePublicResponse>(`/stores/slug/${slug}`),
+            apiRequest<T.StorePublic>(`/stores/slug/${slug}`),
         getById: (storeId: string) =>
-            apiRequest<sdk.StoreResponse>(`/stores/${storeId}`),
+            apiRequest<T.Store>(`/stores/${storeId}`),
         update: (storeId: string, data: sdk.StoreUpdate, token: string) =>
-            apiRequest<sdk.StoreResponse>(`/stores/${storeId}`, { method: "PATCH", body: data, token }),
+            apiRequest<T.Store>(`/stores/${storeId}`, { method: "PATCH", body: data, token }),
         onboardingStatus: (storeId: string, token: string) =>
-            apiRequest<sdk.StoreOnboardingStatusResponse>(`/stores/${storeId}/onboarding-status`, { token }),
+            apiRequest<T.StoreOnboardingStatus>(`/stores/${storeId}/onboarding-status`, { token }),
         refreshOnboardingStatus: (storeId: string, token: string) =>
-            apiRequest<sdk.StoreOnboardingStatusResponse>(`/stores/${storeId}/onboarding-status/refresh`, { method: "POST", token }),
+            apiRequest<T.StoreOnboardingStatus>(`/stores/${storeId}/onboarding-status/refresh`, { method: "POST", token }),
         listMine: (token: string) =>
-            apiRequest<sdk.StoreResponse[]>("/stores", { token }),
+            apiRequest<T.Store[]>("/stores", { token }),
     },
 
     categories: {
         list: (storeId: string) =>
-            apiRequest<sdk.CategoriesPageResponse>(`/stores/${storeId}/categories?page=1&page_size=500`).then((response) => response.items),
+            apiRequest<{ items: T.Category[] }>(`/stores/${storeId}/categories?page=1&page_size=500`).then((response) => response.items),
         create: (storeId: string, data: sdk.CategoryCreate, token: string) =>
-            apiRequest<sdk.CategoryResponse>(`/stores/${storeId}/categories`, { method: "POST", body: data, token }),
+            apiRequest<T.Category>(`/stores/${storeId}/categories`, { method: "POST", body: data, token }),
         update: (storeId: string, categoryId: string, data: sdk.CategoryUpdate, token: string) =>
-            apiRequest<sdk.CategoryResponse>(`/stores/${storeId}/categories/${categoryId}`, { method: "PATCH", body: data, token }),
+            apiRequest<T.Category>(`/stores/${storeId}/categories/${categoryId}`, { method: "PATCH", body: data, token }),
         delete: (storeId: string, categoryId: string, token: string) =>
             apiRequest(`/stores/${storeId}/categories/${categoryId}`, { method: "DELETE", token }),
     },
 
     products: {
         list: (storeId: string, categoryId?: string) =>
-            apiRequest<sdk.ProductsPageResponse>(`/stores/${storeId}/products?page=1&page_size=500${categoryId ? `&category_id=${categoryId}` : ""}`).then((response) => response.items),
+            apiRequest<{ items: T.ProductWithCategoryListItem[] }>(`/stores/${storeId}/products?page=1&page_size=500${categoryId ? `&category_id=${categoryId}` : ""}`).then((response) => response.items),
         get: (storeId: string, productId: string) =>
-            apiRequest<sdk.ProductResponse>(`/stores/${storeId}/products/${productId}`),
+            apiRequest<T.Product>(`/stores/${storeId}/products/${productId}`),
         create: (storeId: string, data: sdk.ProductCreate, token: string) =>
-            apiRequest<sdk.ProductResponse>(`/stores/${storeId}/products`, { method: "POST", body: data, token }),
+            apiRequest<T.Product>(`/stores/${storeId}/products`, { method: "POST", body: data, token }),
         update: (storeId: string, productId: string, data: sdk.ProductUpdate, token: string) =>
-            apiRequest<sdk.ProductResponse>(`/stores/${storeId}/products/${productId}`, { method: "PATCH", body: data, token }),
+            apiRequest<T.Product>(`/stores/${storeId}/products/${productId}`, { method: "PATCH", body: data, token }),
         delete: (storeId: string, productId: string, token: string) =>
             apiRequest(`/stores/${storeId}/products/${productId}`, { method: "DELETE", token }),
     },
 
     orders: {
         create: (storeId: string, data: sdk.OrderCreate) =>
-            apiRequest<sdk.OrderResponse>(`/stores/${storeId}/orders`, { method: "POST", body: data }),
+            apiRequest<T.Order>(`/stores/${storeId}/orders`, { method: "POST", body: data }),
         lookup: (storeId: string, data: sdk.OrderLookupRequest) =>
-            apiRequest<sdk.OrderLookupResponse>(`/stores/${storeId}/orders/lookup`, { method: "POST", body: data }),
+            apiRequest<T.Order>(`/stores/${storeId}/orders/lookup`, { method: "POST", body: data }),
         list: (storeId: string, token: string, statusFilter?: string) =>
-            apiRequest<sdk.OrdersPageResponse>(`/stores/${storeId}/orders?page=1&page_size=500${statusFilter ? `&status=${statusFilter}` : ""}`, { token }).then((response) => response.items),
+            apiRequest<{ items: T.Order[] }>(`/stores/${storeId}/orders?page=1&page_size=500${statusFilter ? `&status=${statusFilter}` : ""}`, { token }).then((response) => response.items),
         get: (storeId: string, orderId: string) =>
-            apiRequest<sdk.OrderResponse>(`/stores/${storeId}/orders/${orderId}`),
+            apiRequest<T.Order>(`/stores/${storeId}/orders/${orderId}`),
         updateStatus: (storeId: string, orderId: string, status: string, token: string) =>
-            apiRequest<sdk.OrderResponse>(`/stores/${storeId}/orders/${orderId}/status`, { method: "PATCH", body: { status }, token }),
+            apiRequest<T.Order>(`/stores/${storeId}/orders/${orderId}/status`, { method: "PATCH", body: { status }, token }),
     },
 
     menuImports: {
         upload: (storeId: string, file: File, token: string) => {
             const formData = new FormData();
             formData.append("file", file);
-            return apiRequest<sdk.MenuImportResponse>(`/stores/${storeId}/menu-imports/upload`, { method: "POST", body: formData, token });
+            return apiRequest<T.MenuImport>(`/stores/${storeId}/menu-imports/upload`, { method: "POST", body: formData, token });
         },
         process: (storeId: string, importId: string, token: string) =>
-            apiRequest<sdk.MenuImportResponse>(`/stores/${storeId}/menu-imports/${importId}/process`, { method: "POST", token }),
+            apiRequest<T.MenuImport>(`/stores/${storeId}/menu-imports/${importId}/process`, { method: "POST", token }),
         get: (storeId: string, importId: string, token: string) =>
-            apiRequest<sdk.MenuImportResponse>(`/stores/${storeId}/menu-imports/${importId}`, { token }),
+            apiRequest<T.MenuImport>(`/stores/${storeId}/menu-imports/${importId}`, { token }),
         list: (storeId: string, token: string) =>
-            apiRequest<sdk.MenuImportResponse[]>(`/stores/${storeId}/menu-imports`, { token }),
+            apiRequest<T.MenuImport[]>(`/stores/${storeId}/menu-imports`, { token }),
         updateItem: (storeId: string, importId: string, itemId: string, data: sdk.MenuImportItemUpdate, token: string) =>
-            apiRequest<sdk.MenuImportItemResponse>(`/stores/${storeId}/menu-imports/${importId}/items/${itemId}`, { method: "PATCH", body: data, token }),
+            apiRequest<T.MenuImportItem>(`/stores/${storeId}/menu-imports/${importId}/items/${itemId}`, { method: "PATCH", body: data, token }),
         publish: (storeId: string, importId: string, token: string) =>
-            apiRequest<sdk.MenuImportResponse>(`/stores/${storeId}/menu-imports/${importId}/publish`, { method: "POST", token }),
+            apiRequest<T.MenuImport>(`/stores/${storeId}/menu-imports/${importId}/publish`, { method: "POST", token }),
     },
 
     payments: {
         createIntent: (orderId: string) =>
-            apiRequest<sdk.CreatePaymentIntentRequest>("/payments/create-intent", { method: "POST", body: { orderId: orderId } }),
+            apiRequest<T.PaymentIntent>("/payments/create-intent", { method: "POST", body: { orderId: orderId } }),
     },
 
     stripe: {

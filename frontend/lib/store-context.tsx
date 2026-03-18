@@ -7,14 +7,15 @@ export type StoreData = {
     name: string;
     slug: string;
     description: string | null;
-    logo_url: string | null;
-    banner_url: string | null;
-    theme_config: {
+    logoUrl: string | null;
+    bannerUrl: string | null;
+    themeConfig: {
         primaryColor?: string;
         accentColor?: string;
         fontFamily?: string;
+        borderRadius?: string;
     } | null;
-    is_active: boolean;
+    isActive: boolean;
     address: string | null;
     phone: string | null;
 };

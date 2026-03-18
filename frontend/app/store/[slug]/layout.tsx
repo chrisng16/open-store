@@ -1,21 +1,9 @@
-import { StoreProvider, type StoreData } from "@/lib/store-context";
+import { api } from "@/lib/api";
+import { StoreProvider } from "@/lib/store-context";
+import { StorePublic } from "@/lib/types";
 import { notFound } from "next/navigation";
 import StoreFooter from "./_components/store-footer";
 import StoreHeader from "./_components/store-header";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-
-async function getStore(slug: string): Promise<StoreData | null> {
-    try {
-        const res = await fetch(`${API_URL}/stores/slug/${slug}`, {
-            next: { revalidate: 60 },
-        });
-        if (!res.ok) return null;
-        return res.json();
-    } catch {
-        return null;
-    }
-}
 
 export default async function StoreLayout({
     children,
@@ -25,18 +13,49 @@ export default async function StoreLayout({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const store = await getStore(slug);
+
+    let store: StorePublic;
+    try {
+        store = await api.stores.getBySlug(slug);
+    } catch (e) {
+        return notFound();
+    }
 
     if (!store) notFound();
 
+    const theme = store.themeConfig;
+    const primaryColor = theme?.primaryColor || "#171717";
+    const accentColor = theme?.accentColor || "#f59e0b";
+
+    // Simple hex to contrast color (white/black)
+    const getContrastColor = (hex: string | any) => {
+        if (typeof hex !== 'string') return "#ffffff";
+        const cleanHex = hex.startsWith('#') ? hex.slice(1) : hex;
+        if (cleanHex.length !== 6) return "#ffffff";
+        const r = parseInt(cleanHex.slice(0, 2), 16);
+        const g = parseInt(cleanHex.slice(2, 4), 16);
+        const b = parseInt(cleanHex.slice(4, 6), 16);
+        const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+        return yiq >= 128 ? "#000000" : "#ffffff";
+    };
+
+    const compRadius = `${theme?.borderRadius ?? 10}px`;
+    const btnRadius = theme?.buttonRadius === "full" ? "9999px" : compRadius;
+    const fontStyle = theme?.fontStyle || "var(--font-geist-sans)";
+
     const themeStyles = {
-        "--store-primary": store.theme_config?.primaryColor || "#2563eb",
-        "--store-accent": store.theme_config?.accentColor || "#f59e0b",
+        "--primary": primaryColor,
+        "--primary-foreground": getContrastColor(primaryColor),
+        "--accent": accentColor,
+        "--accent-foreground": getContrastColor(accentColor),
+        "--radius": compRadius,
+        "--button-radius": btnRadius,
+        "fontFamily": fontStyle,
     } as React.CSSProperties;
 
     return (
-        <StoreProvider store={store}>
-            <div style={themeStyles} className="min-h-screen bg-background text-foreground">
+        <StoreProvider store={store as any}>
+            <div style={themeStyles} className="min-h-screen bg-background text-foreground transition-all duration-500">
                 <StoreHeader store={store} slug={slug} />
                 <main>{children}</main>
                 <StoreFooter />

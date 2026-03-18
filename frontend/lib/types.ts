@@ -23,17 +23,17 @@ export type Store = {
   ownerId: string;
   name: string;
   slug: string;
-  description?: string;
-  logoUrl?: string;
-  bannerUrl?: string;
-  themeConfig?: Record<string, unknown>;
-  stripeAccountId?: string;
+  description: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  themeConfig: Record<string, unknown> | null;
+  stripeAccountId: string | null;
   stripeOnboardingComplete: boolean;
   isActive: boolean;
-  address?: string;
-  phone?: string;
+  address: string | null;
+  phone: string | null;
   timezone: string;
-  businessHours?: BusinessHours;
+  businessHours: BusinessHours | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -42,15 +42,15 @@ export type StorePublic = {
   id: string;
   name: string;
   slug: string;
-  description?: string;
-  logoUrl?: string;
-  bannerUrl?: string;
-  themeConfig?: Record<string, unknown>;
+  description: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  themeConfig: Record<string, unknown> | null;
   isActive: boolean;
-  address?: string;
-  phone?: string;
-  businessHours?: BusinessHours;
-  timezone?: string;
+  address: string | null;
+  phone: string | null;
+  businessHours: BusinessHours | null;
+  timezone: string | null;
 };
 
 export type StoreMember = {
@@ -76,7 +76,7 @@ export type StoreOnboardingStatus = {
   isActive: boolean;
   completedRequiredSteps: number;
   totalRequiredSteps: number;
-  nextStepId?: string;
+  nextStepId: string | null;
   activeProductCount: number;
   hasPublishedImport: boolean;
   steps: OnboardingStepStatus[];
@@ -86,7 +86,7 @@ export type Category = {
     id: string;
     storeId: string;
     name: string;
-    description?: string;
+    description: string | null;
     sortOrder: number;
     isActive: boolean;
     createdAt: string;
@@ -124,18 +124,18 @@ export type OptionList = {
 export type Product = {
     id: string;
     storeId: string;
-    categoryId?: string;
+    categoryId: string | null;
     name: string;
-    description?: string;
+    description: string | null;
     unitAmount: number;
     currency: string;
     decimalPlaces: number;
-    imageUrl?: string;
+    imageUrl: string | null;
     isActive: boolean;
     sortOrder: number;
-    dietaryTags?: string[];
-    allergens?: string[];
-    ingredients?: string;
+    dietaryTags: string[] | null;
+    allergens: string[] | null;
+    ingredients: string | null;
     optionLists: OptionList[];
     createdAt: string;
     updatedAt: string;
@@ -144,18 +144,19 @@ export type Product = {
 export type ProductListItem = {
     id: string;
     storeId: string;
-    categoryId?: string;
+    categoryId: string | null;
     name: string;
-    description?: string;
+    description: string | null;
     unitAmount: number;
     currency: string;
     decimalPlaces: number;
-    imageUrl?: string;
+    imageUrl: string | null;
     isActive: boolean;
     sortOrder: number;
-    dietaryTags?: string[];
-    allergens?: string[];
-    ingredients?: string;
+    dietaryTags: string[] | null;
+    allergens: string[] | null;
+    ingredients: string | null;
+    optionLists: OptionList[];
     createdAt: string;
     updatedAt: string;
 };
@@ -166,14 +167,14 @@ export type ProductListItemCategory = {
 };
 
 export type ProductWithCategoryListItem = ProductListItem & {
-    category?: ProductListItemCategory;
+    category: ProductListItemCategory | null;
 };
 
 export type OrderStatus = "pending" | "paid" | "in_progress" | "ready_for_pickup" | "completed" | "cancelled";
 
 export type OrderItemOption = {
     id: string;
-    optionId?: string;
+    optionId: string | null;
     optionName: string;
     unitAmount: number;
     quantity: number;
@@ -181,7 +182,7 @@ export type OrderItemOption = {
 
 export type OrderItem = {
     id: string;
-    productId?: string;
+    productId: string | null;
     productName: string;
     quantity: number;
     unitAmount: number;
@@ -192,19 +193,19 @@ export type OrderItem = {
 export type Order = {
     id: string;
     storeId: string;
-    customerId?: string;
+    customerId: string | null;
     status: OrderStatus;
     subtotalAmount: number;
     taxAmount: number;
     totalAmount: number;
     currency: string;
     decimalPlaces: number;
-    stripePaymentIntentId?: string;
-    customerName?: string;
-    customerEmail?: string;
-    customerPhone?: string;
-    notes?: string;
-    orderAccessToken?: string;
+    stripePaymentIntentId: string | null;
+    customerName: string | null;
+    customerEmail: string | null;
+    customerPhone: string | null;
+    notes: string | null;
+    orderAccessToken: string | null;
     displayId: string;
     orderReference: string;
     dailySequence: number;
@@ -220,16 +221,16 @@ export type FileType = "application/pdf" | "image/jpeg" | "image/png";
 export type MenuImportItem = {
     id: string;
     menuImportId: string;
-    categoryName?: string;
+    categoryName: string | null;
     itemName: string;
-    description?: string;
-    unitAmount?: number;
-    optionLists?: Record<string, unknown>;
-    dietaryTags?: string[];
-    allergens?: string[];
+    description: string | null;
+    unitAmount: number | null;
+    optionLists: Record<string, unknown> | null;
+    dietaryTags: string[] | null;
+    allergens: string[] | null;
     confidence: number;
     status: ImportItemStatus;
-    linkedProductId?: string;
+    linkedProductId: string | null;
     createdAt: string;
     updatedAt: string;
 };
@@ -239,22 +240,22 @@ export type MenuImport = {
     storeId: string;
     uploadedBy: string;
     fileUrl: string;
-    fileSizeBytes?: number;
-    fileSizeMb?: number;
+    fileSizeBytes: number | null;
+    fileSizeMb: number | null;
     fileType: FileType;
     status: ImportStatus;
-    rawExtraction?: Record<string, unknown>;
-    parsedData?: Record<string, unknown>;
-    confidenceScores?: Record<string, unknown>;
-    errorLog?: string;
-    processingStartedAt?: string;
-    ingestedAt?: string;
-    ingestDurationSeconds?: number;
-    processingElapsedSeconds?: number;
-    aiProcessingSeconds?: number;
-    aiSecondsPerMb?: number;
-    aiMbPerSecond?: number;
-    publishedAt?: string;
+    rawExtraction: Record<string, unknown> | null;
+    parsedData: Record<string, unknown> | null;
+    confidenceScores: Record<string, unknown> | null;
+    errorLog: string | null;
+    processingStartedAt: string | null;
+    ingestedAt: string | null;
+    ingestDurationSeconds: number | null;
+    processingElapsedSeconds: number | null;
+    aiProcessingSeconds: number | null;
+    aiSecondsPerMb: number | null;
+    aiMbPerSecond: number | null;
+    publishedAt: string | null;
     items: MenuImportItem[];
     createdAt: string;
     updatedAt: string;

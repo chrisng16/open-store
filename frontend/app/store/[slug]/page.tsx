@@ -1,7 +1,7 @@
 import { MenuBrowser } from "@/components/store/menu-browser";
 import { StoreNotActive } from "@/components/store/store-not-active";
 import { api } from "@/lib/api";
-import { Category, ProductWithCategoryListItem, Store } from "@/lib/types";
+import { Category, ProductWithCategoryListItem, StorePublic } from "@/lib/types";
 
 async function getCategories(storeId: string): Promise<Category[]> {
     return api.categories.list(storeId);
@@ -11,7 +11,7 @@ async function getProducts(storeId: string): Promise<ProductWithCategoryListItem
     return api.products.list(storeId);
 }
 
-async function getStoreBySlug(slug: string): Promise<Store> {
+async function getStoreBySlug(slug: string): Promise<StorePublic> {
     return api.stores.getBySlug(slug);
 }
 
@@ -79,6 +79,8 @@ export default async function MenuPage({
                     slug={slug}
                     storeName={store.name}
                     storeDescription={store.description}
+                    bannerUrl={store.bannerUrl}
+                    accentColor={store.themeConfig?.accentColor}
                     sections={
                         sections.length > 0
                             ? sections
