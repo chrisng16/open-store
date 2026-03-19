@@ -12,7 +12,6 @@ from app.schemas.payment import CreatePaymentIntentRequest
 from app.services.stripe_service import (
     create_connect_account,
     create_account_link,
-    create_account_login_link,
     get_account_status,
     create_payment_intent,
 )
@@ -70,18 +69,6 @@ async def stripe_status(
     return status
 
 
-@router.post("/stores/{store_id}/stripe/login-link")
-async def stripe_login_link(
-    ctx: StoreContext = Depends(require_role(MemberRole.owner)),
-):
-    store = ctx.store
-    if not store.stripe_account_id:
-        raise HTTPException(status_code=400, detail="Store not set up for payments")
-
-    link = await create_account_login_link(store.stripe_account_id)
-    return {"url": link.url}
-
-
 # --- Payment Intent ---
 @router.post("/payments/create-intent")
 async def create_intent(
@@ -118,14 +105,11 @@ async def create_intent(
     if transfers_capability and transfers_capability != "active":
         raise HTTPException(status_code=400, detail="Store transfer capability is not active")
 
-    settings = get_settings()
-    fee = int(order.total_amount * settings.stripe_platform_fee_percent / 100)
-
     intent = await create_payment_intent(
         amount=order.total_amount,
         currency="usd",
         stripe_account=store.stripe_account_id,
-        application_fee=fee,
+        application_fee=order.platform_fee_amount,
         metadata={
             "order_id": str(order.id),
             "store_id": str(store.id),

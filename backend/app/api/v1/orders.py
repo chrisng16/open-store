@@ -311,7 +311,9 @@ async def create_order(
         order_items.append((order_item, resolved_options))
 
     tax_amount = round(subtotal_amount * 0.08)
-    total_amount = subtotal_amount + tax_amount
+    settings = get_settings()
+    platform_fee_amount = int((subtotal_amount + tax_amount) * settings.stripe_platform_fee_percent / 100)
+    total_amount = subtotal_amount + tax_amount + platform_fee_amount
 
     order = Order(
         store_id=store_id,
@@ -319,6 +321,7 @@ async def create_order(
         status=OrderStatus.pending,
         subtotal_amount=subtotal_amount,
         tax_amount=tax_amount,
+        platform_fee_amount=platform_fee_amount,
         total_amount=total_amount,
         currency="USD",
         decimal_places=2,

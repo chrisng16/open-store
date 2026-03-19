@@ -42,6 +42,7 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     subtotal_amount: Mapped[int] = mapped_column(Integer, nullable=False)
     tax_amount: Mapped[int] = mapped_column(Integer, default=0)
+    platform_fee_amount: Mapped[int] = mapped_column(Integer, default=0)
     total_amount: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
     decimal_places: Mapped[int] = mapped_column(Integer, nullable=False, default=2)

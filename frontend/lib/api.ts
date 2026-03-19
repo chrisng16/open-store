@@ -147,8 +147,6 @@ export const api = {
             apiRequest<{ url: string }>(`/stores/${storeId}/stripe/onboard`, { method: "POST", token }),
         status: (storeId: string, token: string) =>
             apiRequest<{ status: string }>(`/stores/${storeId}/stripe/status`, { token }),
-        loginLink: (storeId: string, token: string) =>
-            apiRequest<{ url: string }>(`/stores/${storeId}/stripe/login-link`, { method: "POST", token }),
     },
 };
 

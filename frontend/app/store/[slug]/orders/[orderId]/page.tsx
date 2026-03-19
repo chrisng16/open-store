@@ -91,6 +91,12 @@ export default async function OrderPage({
                             <span>Tax</span>
                             <span>${(Number(order.tax_amount) / 100).toFixed(2)}</span>
                         </div>
+                        {order.platform_fee_amount > 0 && (
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                                <span>Service fee (5%)</span>
+                                <span>${(Number(order.platform_fee_amount) / 100).toFixed(2)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between font-bold">
                             <span>Total</span>
                             <span>${(Number(order.total_amount) / 100).toFixed(2)}</span>

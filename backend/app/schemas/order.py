@@ -64,6 +64,7 @@ class OrderResponse(BaseModel):
     status: OrderStatus
     subtotal_amount: int
     tax_amount: int
+    platform_fee_amount: int
     total_amount: int
     currency: str
     decimal_places: int

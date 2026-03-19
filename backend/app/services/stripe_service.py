@@ -9,16 +9,10 @@ def _init_stripe():
 
 
 async def create_connect_account(business_name: str, owner_id) -> stripe.Account:
-    """Create a Stripe Express connected account."""
+    """Create a Stripe Standard connected account."""
     _init_stripe()
     account = stripe.Account.create(
-        type="express",
-        business_type="individual",
-        business_profile={"name": business_name},
-        capabilities={
-            "card_payments": {"requested": True},
-            "transfers": {"requested": True},
-        },
+        type="standard",
         metadata={"owner_id": str(owner_id)},
     )
     return account
@@ -38,12 +32,6 @@ async def create_account_link(
         type="account_onboarding",
     )
     return link
-
-
-async def create_account_login_link(account_id: str):
-    """Create a Stripe Express dashboard login link for a connected account."""
-    _init_stripe()
-    return stripe.Account.create_login_link(account_id)
 
 
 async def get_account_status(account_id: str) -> dict:

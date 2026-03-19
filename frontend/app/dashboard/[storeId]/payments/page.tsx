@@ -133,19 +133,6 @@ export default function PaymentsPage({
         },
     });
 
-    const accountLoginMutation = useMutation({
-        mutationFn: async () =>
-            fetchWithAccessToken<{ url: string }>(`/stores/${storeId}/stripe/login-link`, {
-                method: "POST",
-            }),
-        onSuccess: (data) => {
-            window.location.href = data.url;
-        },
-        onError: (error) => {
-            setErrorMessage(error instanceof Error ? error.message : "Failed to open Stripe account");
-        },
-    });
-
     const loadingAccess = membersQuery.isPending || currentUserPending;
     const isInitialLoading = loadingAccess || storePending;
     const hasStripeAccount = !!store && (stripeStatus?.connected || !!store.stripeAccountId);
@@ -156,7 +143,6 @@ export default function PaymentsPage({
 
     return (
         <>
-
             <div className="sticky top-0 z-20 border-b bg-background-elevated/70 backdrop-blur rounded-t-md">
                 <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 py-3 md:px-6">
                     <div>
@@ -196,16 +182,10 @@ export default function PaymentsPage({
                                         size="sm"
                                         variant="outline"
                                         onClick={() => {
-                                            setErrorMessage(null);
-                                            accountLoginMutation.mutate();
+                                            window.open("https://dashboard.stripe.com/", "_blank");
                                         }}
-                                        disabled={accountLoginMutation.isPending}
                                     >
-                                        {accountLoginMutation.isPending ? (
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <ExternalLink className="mr-2 h-4 w-4" />
-                                        )}
+                                        <ExternalLink className="mr-2 h-4 w-4" />
                                         Manage Stripe Account
                                     </Button>
                                 ) : (
