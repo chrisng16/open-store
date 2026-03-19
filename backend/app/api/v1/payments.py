@@ -124,7 +124,7 @@ async def create_intent(
     intent = await create_payment_intent(
         amount=order.total_amount,
         currency="usd",
-        destination_account=store.stripe_account_id,
+        stripe_account=store.stripe_account_id,
         application_fee=fee,
         metadata={
             "order_id": str(order.id),
@@ -135,7 +135,11 @@ async def create_intent(
     order.stripe_payment_intent_id = intent.id
     await db.flush()
 
-    return {"client_secret": intent.client_secret, "payment_intent_id": intent.id}
+    return {
+        "client_secret": intent.client_secret,
+        "payment_intent_id": intent.id,
+        "stripe_account_id": store.stripe_account_id,
+    }
 
 
 # --- Stripe Webhook ---

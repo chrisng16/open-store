@@ -39,11 +39,6 @@ export default function StoreHeader({ store, slug }: { store: StoreData; slug: s
                                     </Button>
                                 </Link>
                             )}
-                            <Link href={`/store/${slug}/checkout`}>
-                                <Button variant="default" size="sm" className="rounded-full px-4 shadow-sm">
-                                    Checkout
-                                </Button>
-                            </Link>
                             <Link href={`/store/${slug}/orders`}>
                                 <Button variant="outline" size="sm" className="rounded-full px-4 border-border/50">
                                     Track order
@@ -53,7 +48,7 @@ export default function StoreHeader({ store, slug }: { store: StoreData; slug: s
 
                         <div className="flex flex-wrap items-center gap-2 ml-2">
                             <StoreThemeToggle />
-                            <CartButton slug={slug} storeId={store.id} size={'sm'} className="rounded-full" />
+                            <CartButton slug={slug} storeId={store.id} size={'sm'} />
                         </div>
                     </div>
                 </div>

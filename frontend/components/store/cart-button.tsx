@@ -89,7 +89,6 @@ export function CartButton({
             <Sheet>
                 <SheetTrigger asChild>
                     <Button
-                        variant="outline"
                         className={cn("relative w-16 rounded-full px-6", props.className)}
                         {...props}
                     >
@@ -191,19 +190,21 @@ export function CartButton({
                             </p>
                         </div>
                         <SheetClose asChild>
-                            <Button asChild className="w-full rounded-full" disabled={safeItems.length === 0}>
-                                <Link href={`/store/${slug}/checkout`}>Checkout</Link>
+                            <Button asChild variant="default" className="w-full" disabled={safeItems.length === 0}>
+                                <Link href={`/store/${slug}/checkout`}>
+                                    Checkout
+                                </Link>
                             </Button>
                         </SheetClose>
 
                         <SheetClose asChild>
-                            <Button variant="outline" className="w-full rounded-full">
+                            <Button variant="outline" className="w-full">
                                 Continue shopping
                             </Button>
                         </SheetClose>
                     </SheetFooter>
                 </SheetContent>
-            </Sheet>
+            </Sheet >
         </>
     );
 }

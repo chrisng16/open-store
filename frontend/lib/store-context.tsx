@@ -15,6 +15,7 @@ export type StoreData = {
         fontFamily?: string;
         borderRadius?: string;
     } | null;
+    stripeAccountId: string | null;
     isActive: boolean;
     address: string | null;
     phone: string | null;

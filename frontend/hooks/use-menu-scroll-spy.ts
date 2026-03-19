@@ -85,7 +85,7 @@ export function useMenuScrollSpy({
     //
     // Runs once per animation frame (via rAF gate on the scroll event).
     // Picks the section with the most pixels visible in the detection band
-    // (from sticky offset → 60 % of viewport height). This keeps a tall
+    // (from sticky offset → 30 % of viewport height). This keeps a tall
     // section active the entire time the user scrolls through it.
 
     const runScrollSpy = useCallback(() => {
@@ -93,7 +93,7 @@ export function useMenuScrollSpy({
         if (sections.length === 0) return;
 
         const bandTop = getStickyOffset();
-        const bandBottom = window.innerHeight * 0.6;
+        const bandBottom = window.innerHeight * 0.2;
 
         let bestId = sections[0].id;
         let bestVisible = -1;
@@ -127,10 +127,20 @@ export function useMenuScrollSpy({
     }, [runScrollSpy]);
 
     useEffect(() => {
+        // Reset stale programmatic-scroll suppression from a previous visit.
+        isProgrammaticScrollRef.current = false;
+
         window.addEventListener("scroll", onScroll, { passive: true });
-        onScroll(); // sync on mount
+
+        // Delay the initial sync so the browser has time to restore scroll
+        // position and mount all section elements after navigation.
+        const initTimer = setTimeout(() => {
+            onScroll();
+        }, 100);
+
         return () => {
             window.removeEventListener("scroll", onScroll);
+            clearTimeout(initTimer);
             if (spyRafRef.current !== null) cancelAnimationFrame(spyRafRef.current);
             if (settleRafRef.current !== null) cancelAnimationFrame(settleRafRef.current);
         };

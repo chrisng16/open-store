@@ -87,26 +87,33 @@ async def get_account_status(account_id: str) -> dict:
 async def create_payment_intent(
     amount: int,
     currency: str,
-    destination_account: str,
+    stripe_account: str,
     application_fee: int,
     metadata: dict | None = None,
 ) -> stripe.PaymentIntent:
-    """Create a PaymentIntent with destination charge."""
+    """Create a PaymentIntent with direct charge."""
     _init_stripe()
     intent = stripe.PaymentIntent.create(
         amount=amount,
         currency=currency,
         application_fee_amount=application_fee,
-        transfer_data={"destination": destination_account},
         metadata=metadata or {},
+        stripe_account=stripe_account,
     )
     return intent
 
 
-async def create_refund(payment_intent_id: str, amount: int | None = None) -> stripe.Refund:
+async def create_refund(
+    payment_intent_id: str,
+    stripe_account: str,
+    amount: int | None = None,
+) -> stripe.Refund:
     """Refund a PaymentIntent (full or partial)."""
     _init_stripe()
-    params: dict[str, Any] = {"payment_intent": payment_intent_id}
+    params: dict[str, Any] = {
+        "payment_intent": payment_intent_id,
+        "stripe_account": stripe_account,
+    }
     if amount is not None:
         params["amount"] = amount
     return stripe.Refund.create(**params)

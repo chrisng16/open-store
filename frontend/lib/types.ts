@@ -46,6 +46,7 @@ export type StorePublic = {
   logoUrl: string | null;
   bannerUrl: string | null;
   themeConfig: Record<string, unknown> | null;
+  stripeAccountId: string | null;
   isActive: boolean;
   address: string | null;
   phone: string | null;
@@ -264,4 +265,5 @@ export type MenuImport = {
 export type PaymentIntent = {
     clientSecret: string;
     paymentIntentId: string;
+    stripeAccountId: string;
 };

@@ -98,6 +98,7 @@ class StorePublicResponse(BaseModel):
     logo_url: str | None
     banner_url: str | None
     theme_config: dict | None
+    stripe_account_id: str | None
     is_active: bool
     address: str | None
     phone: str | None

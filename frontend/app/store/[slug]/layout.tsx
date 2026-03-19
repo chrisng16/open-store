@@ -4,6 +4,7 @@ import { StorePublic } from "@/lib/types";
 import { notFound } from "next/navigation";
 import StoreFooter from "./_components/store-footer";
 import StoreHeader from "./_components/store-header";
+import { StoreThemeVars } from "./_components/store-theme-vars";
 
 export default async function StoreLayout({
     children,
@@ -24,8 +25,8 @@ export default async function StoreLayout({
     if (!store) notFound();
 
     const theme = store.themeConfig;
-    const primaryColor = theme?.primaryColor || "#171717";
-    const accentColor = theme?.accentColor || "#f59e0b";
+    const primaryColor = theme?.primaryColor as string || "#171717";
+    const accentColor = theme?.accentColor as string || "#f59e0b";
 
     // Simple hex to contrast color (white/black)
     const getContrastColor = (hex: string | any) => {
@@ -41,21 +42,21 @@ export default async function StoreLayout({
 
     const compRadius = `${theme?.borderRadius ?? 10}px`;
     const btnRadius = theme?.buttonRadius === "full" ? "9999px" : compRadius;
-    const fontStyle = theme?.fontStyle || "var(--font-geist-sans)";
+    const fontStyle = (theme?.fontStyle || "var(--font-geist-sans)") as string;
 
-    const themeStyles = {
+    const cssVars = {
         "--primary": primaryColor,
         "--primary-foreground": getContrastColor(primaryColor),
         "--accent": accentColor,
         "--accent-foreground": getContrastColor(accentColor),
         "--radius": compRadius,
         "--button-radius": btnRadius,
-        "fontFamily": fontStyle,
-    } as React.CSSProperties;
+    };
 
     return (
         <StoreProvider store={store as any}>
-            <div style={themeStyles} className="min-h-screen bg-background text-foreground transition-all duration-500">
+            <StoreThemeVars vars={cssVars} />  {/* ← sets vars on :root */}
+            <div style={{ fontFamily: fontStyle }} className="min-h-screen bg-background text-foreground transition-all duration-500">
                 <StoreHeader store={store} slug={slug} />
                 <main>{children}</main>
                 <StoreFooter />

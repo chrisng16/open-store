@@ -18,11 +18,10 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const stripePromise = getStripe();
 
-// ─── Platform fee: 5% covers Stripe (2.9% + $0.30), Connect fees,
-//     chargebacks (~0.5%), refund-loss (~0.2%), and infra (~0.3%)
-//     with ~1.35% margin remaining.
+
+// ─── Platform fee: 5% is profit for Openstore.
+//     Stripe fees are now paid by the connected store via Direct Charges.
 export const PLATFORM_FEE_RATE = 0.05; // 5%
 
 function formatPhone(value: string): string {
@@ -140,6 +139,12 @@ export default function CheckoutPage() {
     const params = useParams<{ slug: string }>();
     const slug = params.slug;
     const store = useStore();
+
+    const stripePromise = useMemo(
+        () => getStripe(store.stripeAccountId || undefined),
+        [store.stripeAccountId]
+    );
+
     const { items } = useCartSummary(slug);
     const { clearCart } = useCartMutations();
     const { pricedItems, subtotal, tax, total, isLoading, error } = useCartPricing({
@@ -169,6 +174,7 @@ export default function CheckoutPage() {
             </div>
         );
     }
+
 
     return (
         <Elements stripe={stripePromise}>
@@ -483,52 +489,51 @@ function CheckoutForm({
                                 </button>
                             )}
                         </CardHeader>
-                        {step === "payment" ? (
-                            <CardContent className="space-y-4">
-                                <div
-                                    className={cn(
-                                        "rounded-2xl border px-4 py-4 transition-colors",
-                                        cardError ? "border-destructive" : "border-border/70"
-                                    )}
-                                    style={{ backgroundColor: isDark ? "#18181b" : "#ffffff" }}
-                                >
-                                    <CardElement
-                                        key={`card-element-${resolvedTheme ?? "system"}`}
-                                        options={cardElementOptions}
-                                        onChange={(e) => {
-                                            setCardComplete(e.complete);
-                                            setCardError(e.error?.message ?? null);
-                                        }}
-                                    />
-                                </div>
-                                {cardError && <FieldError message={cardError} />}
+                        <CardContent className={cn("space-y-4", step !== "payment" && "hidden")}>
+                            <div
+                                className={cn(
+                                    "rounded-2xl border px-4 py-4 transition-colors",
+                                    cardError ? "border-destructive" : "border-border/70"
+                                )}
+                                style={{ backgroundColor: isDark ? "#18181b" : "#ffffff" }}
+                            >
+                                <CardElement
+                                    key={`card-element-${resolvedTheme ?? "system"}`}
+                                    options={cardElementOptions}
+                                    onChange={(e) => {
+                                        setCardComplete(e.complete);
+                                        setCardError(e.error?.message ?? null);
+                                    }}
+                                />
+                            </div>
+                            {cardError && <FieldError message={cardError} />}
 
-                                {/* Trust signals */}
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <svg className="h-3.5 w-3.5 shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
-                                    </svg>
-                                    256-bit SSL encrypted · Powered by Stripe
-                                </div>
+                            {/* Trust signals */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <svg className="h-3.5 w-3.5 shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
+                                </svg>
+                                256-bit SSL encrypted · Powered by Stripe
+                            </div>
 
-                                <p className="text-xs text-muted-foreground">
-                                    Test card: <span className="font-mono">4242 4242 4242 4242</span>, any future expiry, any CVC.
-                                </p>
+                            <p className="text-xs text-muted-foreground">
+                                Test card: <span className="font-mono">4242 4242 4242 4242</span>, any future expiry, any CVC.
+                            </p>
 
-                                <Button
-                                    type="button"
-                                    className="w-full rounded-full"
-                                    onClick={handleAdvancePayment}
-                                    disabled={!cardComplete}
-                                >
-                                    Review Order
-                                    <svg className="ml-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                                    </svg>
-                                </Button>
-                            </CardContent>
-                        ) : step === "review" ? (
-                            <CardContent className="pb-5">
+                            <Button
+                                type="button"
+                                className="w-full rounded-full"
+                                onClick={handleAdvancePayment}
+                                disabled={!cardComplete}
+                            >
+                                Review Order
+                                <svg className="ml-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                </svg>
+                            </Button>
+                        </CardContent>
+                        {step === "review" && (
+                            <CardContent className="pb-5 pt-0">
                                 <div className="flex items-center gap-2 text-sm font-medium">
                                     <svg className="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
                                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
@@ -536,7 +541,7 @@ function CheckoutForm({
                                     Card ending in ····
                                 </div>
                             </CardContent>
-                        ) : null}
+                        )}
                     </Card>
 
                     {/* STEP 3: Review & Place Order (mobile — shown inline on small screens) */}
