@@ -1,5 +1,6 @@
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
-import { Store, StoreOnboardingStatus } from "@/lib/types";
+export type { Store, StoreOnboardingStatus } from "@/lib/types";
+import type { Store, StoreOnboardingStatus } from "@/lib/types";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 
 export const storesQueryOptions = queryOptions({

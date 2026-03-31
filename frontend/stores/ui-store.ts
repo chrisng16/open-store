@@ -40,6 +40,7 @@ type UIState = {
     storefrontProductDialogItemId: string | null;
     isCartProductDialogOpen: boolean;
     cartProductDialogItemId: string | null;
+    isCartSheetOpen: boolean;
     categoryFormData: CategoryDialogFormData;
     productFormData: ProductDialogFormData;
 
@@ -58,6 +59,9 @@ type UIState = {
 
     openCartProductDialog: (itemId: string) => void;
     closeCartProductDialog: () => void;
+
+    openCartSheet: () => void;
+    closeCartSheet: () => void;
 };
 
 export const emptyCategoryFormData: CategoryDialogFormData = {
@@ -84,6 +88,7 @@ export const useUIStore = create<UIState>((set) => ({
     storefrontProductDialogItemId: null,
     isCartProductDialogOpen: false,
     cartProductDialogItemId: null,
+    isCartSheetOpen: false,
     categoryFormData: emptyCategoryFormData,
     productFormData: emptyProductFormData,
 
@@ -131,6 +136,15 @@ export const useUIStore = create<UIState>((set) => ({
     closeCartProductDialog: () =>
         set({
             isCartProductDialogOpen: false,
+        }),
+
+    openCartSheet: () =>
+        set({
+            isCartSheetOpen: true,
+        }),
+    closeCartSheet: () =>
+        set({
+            isCartSheetOpen: false,
         }),
 }));
 
@@ -185,6 +199,16 @@ export function useCartProductDialogState() {
             itemId: state.cartProductDialogItemId,
             open: state.openCartProductDialog,
             close: state.closeCartProductDialog,
+        }))
+    );
+}
+
+export function useCartSheetState() {
+    return useUIStore(
+        useShallow((state) => ({
+            isOpen: state.isCartSheetOpen,
+            open: state.openCartSheet,
+            close: state.closeCartSheet,
         }))
     );
 }

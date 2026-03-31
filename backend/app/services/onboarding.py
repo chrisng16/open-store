@@ -5,6 +5,7 @@ from app.models.menu_import import ImportStatus, MenuImport
 from app.models.product import Product
 from app.models.store import Store
 from app.schemas.store import OnboardingStepStatus, StoreOnboardingStatusResponse
+from app.services.stripe_service import get_tax_settings
 
 
 async def get_store_onboarding_status(
@@ -31,6 +32,12 @@ async def get_store_onboarding_status(
     stripe_complete = bool(store.stripe_onboarding_complete)
     menu_complete = active_product_count > 0 or has_published_import
 
+    # Check Tax Setup
+    tax_complete = False
+    if store.stripe_account_id:
+        tax_status = await get_tax_settings(store.stripe_account_id)
+        tax_complete = tax_status["status"] == "active"
+
     steps = [
         OnboardingStepStatus(
             id="store_details",
@@ -43,12 +50,21 @@ async def get_store_onboarding_status(
             id="stripe_connect",
             title="Stripe Connect",
             completed=stripe_complete,
+            required=True,
             blocking_reasons=[] if stripe_complete else ["Complete Stripe Connect onboarding."],
+        ),
+        OnboardingStepStatus(
+            id="tax_setup",
+            title="Tax Settings",
+            completed=tax_complete,
+            required=True,
+            blocking_reasons=[] if tax_complete else ["Register to collect tax in the Stripe Dashboard."],
         ),
         OnboardingStepStatus(
             id="menu_setup",
             title="Menu setup",
             completed=menu_complete,
+            required=True,
             blocking_reasons=[]
             if menu_complete
             else ["Publish at least one product using import or manual entry."],

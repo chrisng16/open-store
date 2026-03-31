@@ -6,7 +6,7 @@ import re
 from hashlib import sha256
 from datetime import date, datetime, time, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -24,12 +24,20 @@ from app.models.store import MemberRole, Store, StoreMember
 from app.models.order import Order, OrderItem, OrderItemOption, OrderStatus
 from app.models.product import Product, Option, OptionList
 from app.schemas.order import (
+    Address,
+    CheckoutInitiateRequest,
     OrderCreate,
     OrderLookupRequest,
     OrderLookupResponse,
     OrderResponse,
     OrdersPageResponse,
     OrderStatusUpdate,
+    OrderUpdate,
+)
+from app.services.stripe_service import (
+    calculate_stripe_tax,
+    create_payment_intent,
+    update_payment_intent,
 )
 from app.services.onboarding import get_store_onboarding_status
 
@@ -186,6 +194,214 @@ def _apply_order_filters(
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@router.post("/checkout/initiate")
+async def initiate_checkout(
+    store_id: uuid.UUID,
+    payload: CheckoutInitiateRequest,
+    user: CurrentUser | None = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Fetch the store to get the Stripe account ID
+    store_result = await db.execute(select(Store).where(Store.id == store_id))
+    store = store_result.scalar_one_or_none()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+
+    if not store.stripe_account_id:
+        raise HTTPException(status_code=400, detail="Store is not set up for payments")
+
+    # Security: Lookup real prices for products and options.
+    subtotal_amount = 0
+    order_items_to_create = []
+    stripe_tax_items = []
+
+    # Build IDs for lookup.
+    product_ids = {item.product_id for item in payload.items}
+    
+    # Fetch all relevant products.
+    p_result = await db.execute(
+        select(Product).where(
+            Product.id.in_(product_ids),
+            Product.store_id == store_id,
+            Product.is_active.is_(True)
+        )
+    )
+    products = {p.id: p for p in p_result.scalars().all()}
+
+    # Fetch all relevant options.
+    all_option_ids = {
+        opt.option_id
+        for item in payload.items
+        for opt in item.options
+    }
+    
+    options_by_id: dict[uuid.UUID, tuple[uuid.UUID, Option]] = {}
+    if all_option_ids:
+        options_result = await db.execute(
+            select(OptionList.product_id, Option)
+            .join(Option, Option.option_list_id == OptionList.id)
+            .where(Option.id.in_(all_option_ids))
+        )
+        options_by_id = {
+            option.id: (product_id, option)
+            for product_id, option in options_result.all()
+        }
+
+    for item_data in payload.items:
+        product = products.get(item_data.product_id)
+        if not product:
+            raise HTTPException(status_code=400, detail=f"Product {item_data.product_id} not found or unavailable")
+
+        item_total = product.unit_amount * item_data.quantity
+        resolved_options: list[OrderItemOption] = []
+        
+        for opt_data in item_data.options:
+            option_entry = options_by_id.get(opt_data.option_id)
+            if not option_entry:
+                raise HTTPException(status_code=400, detail=f"Option {opt_data.option_id} not found")
+            
+            option_product_id, option_model = option_entry
+            if option_product_id != product.id:
+                raise HTTPException(status_code=400, detail=f"Option {opt_data.option_id} does not belong to product {product.id}")
+
+            option_total = option_model.unit_amount * opt_data.quantity * item_data.quantity
+            item_total += option_total
+            resolved_options.append(
+                OrderItemOption(
+                    option_id=option_model.id,
+                    option_name=option_model.name,
+                    unit_amount=option_model.unit_amount,
+                    quantity=opt_data.quantity,
+                )
+            )
+
+        subtotal_amount += item_total
+        
+        order_item = OrderItem(
+            product_id=product.id,
+            product_name=product.name,
+            quantity=item_data.quantity,
+            unit_amount=product.unit_amount,
+            total_amount=item_total,
+        )
+        order_items_to_create.append((order_item, resolved_options))
+
+        # Build Stripe Tax line item.
+        stripe_tax_items.append({
+            "amount": item_total,
+            "reference": str(product.id),
+        })
+
+    # Call calculate_stripe_tax.
+    tax_calc = await calculate_stripe_tax(
+        store_stripe_account_id=store.stripe_account_id,
+        currency="usd",
+        line_items=stripe_tax_items,
+        customer_address=payload.shipping_address.model_dump(),
+    )
+
+    print(f"Stripe tax calculation result: {tax_calc}")
+
+    tax_amount = tax_calc.tax_amount_exclusive + tax_calc.tax_amount_inclusive
+    
+    # Extract total tax rate percentage by summing all breakdown components
+    tax_rate = 0.0
+    if tax_calc.tax_breakdown:
+        for b in tax_calc.tax_breakdown:
+            rate_details = b.get("tax_rate_details")
+            if rate_details:
+                try:
+                    # percentage_decimal is a string like "8.25"
+                    tax_rate += float(rate_details.get("percentage_decimal", 0.0))
+                except (ValueError, TypeError):
+                    continue
+
+    settings = get_settings()
+    platform_fee_percent = settings.stripe_platform_fee_percent or 0
+    platform_fee_amount = int((subtotal_amount + tax_amount) * platform_fee_percent / 100)
+    total_amount = subtotal_amount + tax_amount + platform_fee_amount
+
+    # Daily sequence logic matching create_order
+    today = datetime.now(timezone.utc).date()
+    lock_key = f"{store_id}:{today.isoformat()}"
+    await db.execute(
+        select(func.pg_advisory_xact_lock(func.hashtext(lock_key)))
+    )
+
+    day_start = datetime.combine(today, time.min, tzinfo=timezone.utc)
+    day_end = datetime.combine(today, time.max, tzinfo=timezone.utc)
+
+    result = await db.execute(
+        select(func.coalesce(func.max(Order.daily_sequence), 0)).where(
+            Order.store_id == store_id,
+            Order.created_at >= day_start,
+            Order.created_at <= day_end,
+        )
+    )
+    daily_seq = (result.scalar() or 0) + 1
+
+    token = _generate_order_token()
+    order_reference = build_order_reference(today, daily_seq, token)
+    display_id = build_display_id(daily_seq, token)
+
+    order = Order(
+        store_id=store_id,
+        customer_id=user.id if user else None,
+        status=OrderStatus.pending,
+        subtotal_amount=subtotal_amount,
+        tax_amount=tax_amount,
+        platform_fee_amount=platform_fee_amount,
+        total_amount=total_amount,
+        currency="USD",
+        customer_name=payload.customer_name,
+        customer_email=payload.customer_email,
+        customer_phone=payload.customer_phone,
+        notes=payload.notes,
+        daily_sequence=daily_seq,
+        order_token=token,
+        order_reference=order_reference,
+        display_id=display_id,
+    )
+    db.add(order)
+    await db.flush()
+
+    for order_item, option_models in order_items_to_create:
+        order_item.order_id = order.id
+        db.add(order_item)
+        await db.flush()
+
+        for option_model in option_models:
+            option_model.order_item_id = order_item.id
+            db.add(option_model)
+
+    await db.flush()
+
+    # Create payment intent.
+    intent = await create_payment_intent(
+        amount=total_amount,
+        stripe_account=store.stripe_account_id,
+        application_fee_amount=platform_fee_amount,
+        idempotency_key=f"pi-{order.id}",
+        metadata={
+            "order_id": str(order.id),
+        },
+    )
+    
+    order.stripe_payment_intent_id = intent.id
+    await db.flush()
+
+    return {
+        "client_secret": intent.client_secret,
+        "order_id": order.id,
+        "order_access_token": build_order_access_token(order.id, order.store_id),
+        "subtotal": subtotal_amount,
+        "tax": tax_amount,
+        "tax_rate": tax_rate,
+        "platform_fee": platform_fee_amount,
+        "total": total_amount,
+    }
+
 
 @router.post("/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 async def create_order(
@@ -525,7 +741,7 @@ async def lookup_order(
 async def get_order(
     store_id: uuid.UUID,
     order_id: uuid.UUID,
-    access_token: str | None = Query(default=None),
+    access_token: str | None = Query(default=None, alias="access"),
     user: CurrentUser | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -555,6 +771,64 @@ async def get_order(
     if not (has_valid_token or is_owner_customer or is_store_member):
         raise HTTPException(status_code=403, detail="Not allowed to view this order")
 
+    return order
+
+
+@router.patch("/orders/{order_id}", response_model=OrderResponse)
+async def update_order(
+    store_id: uuid.UUID,
+    order_id: uuid.UUID,
+    data: OrderUpdate,
+    access_token: str | None = Query(default=None, alias="access"),
+    user: CurrentUser | None = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update order details (e.g. contact info) before payment is finalized."""
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id, Order.store_id == store_id)
+        .options(selectinload(Order.items).selectinload(OrderItem.options))
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Security check: must have valid guest token, be the customer who placed
+    # it, or be a store member.
+    has_valid_token = bool(access_token and validate_order_access_token(order.id, order.store_id, access_token))
+    is_owner_customer = bool(user and order.customer_id and user.id == order.customer_id)
+    is_store_member = False
+    if user:
+        member_result = await db.execute(
+            select(StoreMember.id).where(
+                StoreMember.store_id == order.store_id,
+                StoreMember.user_id == user.id,
+            )
+        )
+        is_store_member = member_result.scalar_one_or_none() is not None
+
+    if not (has_valid_token or is_owner_customer or is_store_member):
+        raise HTTPException(status_code=403, detail="Not allowed to update this order")
+
+    # Guard: only pending orders can be updated.
+    if order.status != OrderStatus.pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Only pending orders can be updated.",
+        )
+
+    # Apply updates
+    if data.customer_name is not None:
+        order.customer_name = data.customer_name
+    if data.customer_email is not None:
+        order.customer_email = data.customer_email
+    if data.customer_phone is not None:
+        order.customer_phone = data.customer_phone
+    if data.notes is not None:
+        order.notes = data.notes
+
+    await db.flush()
+    await db.refresh(order, attribute_names=["updated_at"])
     return order
 
 

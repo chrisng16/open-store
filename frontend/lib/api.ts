@@ -107,10 +107,14 @@ export const api = {
     },
 
     orders: {
+        initiateCheckout: (storeId: string, data: any) =>
+            apiRequest<any>(`/stores/${storeId}/checkout/initiate`, { method: "POST", body: data }),
         create: (storeId: string, data: sdk.OrderCreate) =>
             apiRequest<T.Order>(`/stores/${storeId}/orders`, { method: "POST", body: data }),
+        update: (storeId: string, orderId: string, data: any, accessToken?: string) =>
+            apiRequest<T.Order>(`/stores/${storeId}/orders/${orderId}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`, { method: "PATCH", body: data }),
         lookup: (storeId: string, data: sdk.OrderLookupRequest) =>
-            apiRequest<T.Order>(`/stores/${storeId}/orders/lookup`, { method: "POST", body: data }),
+            apiRequest<T.OrderLookupResponse>(`/stores/${storeId}/orders/lookup`, { method: "POST", body: data }),
         list: (storeId: string, token: string, statusFilter?: string) =>
             apiRequest<{ items: T.Order[] }>(`/stores/${storeId}/orders?page=1&page_size=500${statusFilter ? `&status=${statusFilter}` : ""}`, { token }).then((response) => response.items),
         get: (storeId: string, orderId: string) =>
@@ -138,8 +142,18 @@ export const api = {
     },
 
     payments: {
-        createIntent: (orderId: string) =>
-            apiRequest<T.PaymentIntent>("/payments/create-intent", { method: "POST", body: { orderId: orderId } }),
+        // orderAccessToken is the guest token returned when the order was created.
+        // It is embedded by the backend into the Stripe return_url so the
+        // confirmation page can fetch the token-gated order after the redirect,
+        // without requiring the customer to be logged in.
+        createSession: (orderId: string, orderAccessToken?: string) =>
+            apiRequest<T.CheckoutSession>("/payments/create-session", {
+                method: "POST",
+                body: {
+                    order_id: orderId,
+                    ...(orderAccessToken ? { order_access_token: orderAccessToken } : {}),
+                },
+            }),
     },
 
     stripe: {

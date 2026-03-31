@@ -5,7 +5,7 @@ import { useMenuScrollSpy } from "@/hooks/use-menu-scroll-spy";
 import { useCartMutations } from "@/lib/cart-store";
 import { Product, ProductWithCategoryListItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useStorefrontProductDialogState } from "@/stores/ui-store";
+import { useCartSheetState, useStorefrontProductDialogState } from "@/stores/ui-store";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -156,6 +156,7 @@ export function MenuBrowser({
     const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
     const { setStoreSlug, addItem } = useCartMutations();
+    const cartSheet = useCartSheetState();
     const storefrontProductDialog = useStorefrontProductDialogState();
 
     const totalItems = useMemo(
@@ -225,8 +226,7 @@ export function MenuBrowser({
                         action: {
                             label: "View cart",
                             onClick: () => {
-                                const cartUrl = `/store/${slug}/cart`;
-                                window.location.href = cartUrl;
+                                cartSheet.open();
                             },
                         }
                     });

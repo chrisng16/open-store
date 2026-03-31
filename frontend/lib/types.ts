@@ -1,86 +1,86 @@
 export type BusinessHourRange = {
-  startMin: number;
-  endMin: number;
+    startMin: number;
+    endMin: number;
 };
 
 export type BusinessDayHours = {
-  status: "open24" | "closed" | "ranges";
-  ranges?: BusinessHourRange[];
+    status: "open24" | "closed" | "ranges";
+    ranges?: BusinessHourRange[];
 };
 
 export type BusinessHours = {
-  sun: BusinessDayHours;
-  mon: BusinessDayHours;
-  tue: BusinessDayHours;
-  wed: BusinessDayHours;
-  thu: BusinessDayHours;
-  fri: BusinessDayHours;
-  sat: BusinessDayHours;
+    sun: BusinessDayHours;
+    mon: BusinessDayHours;
+    tue: BusinessDayHours;
+    wed: BusinessDayHours;
+    thu: BusinessDayHours;
+    fri: BusinessDayHours;
+    sat: BusinessDayHours;
 };
 
 export type Store = {
-  id: string;
-  ownerId: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  logoUrl: string | null;
-  bannerUrl: string | null;
-  themeConfig: Record<string, unknown> | null;
-  stripeAccountId: string | null;
-  stripeOnboardingComplete: boolean;
-  isActive: boolean;
-  address: string | null;
-  phone: string | null;
-  timezone: string;
-  businessHours: BusinessHours | null;
-  createdAt: string;
-  updatedAt: string;
+    id: string;
+    ownerId: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    logoUrl: string | null;
+    bannerUrl: string | null;
+    themeConfig: Record<string, unknown> | null;
+    stripeAccountId: string | null;
+    stripeOnboardingComplete: boolean;
+    isActive: boolean;
+    address: string | null;
+    phone: string | null;
+    timezone: string;
+    businessHours: BusinessHours | null;
+    createdAt: string;
+    updatedAt: string;
 };
 
 export type StorePublic = {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  logoUrl: string | null;
-  bannerUrl: string | null;
-  themeConfig: Record<string, unknown> | null;
-  stripeAccountId: string | null;
-  isActive: boolean;
-  address: string | null;
-  phone: string | null;
-  businessHours: BusinessHours | null;
-  timezone: string | null;
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    logoUrl: string | null;
+    bannerUrl: string | null;
+    themeConfig: Record<string, unknown> | null;
+    stripeAccountId: string | null;
+    isActive: boolean;
+    address: string | null;
+    phone: string | null;
+    businessHours: BusinessHours | null;
+    timezone: string | null;
 };
 
 export type StoreMember = {
-  id: string;
-  storeId: string;
-  userId: string;
-  role: string;
-  createdAt: string;
+    id: string;
+    storeId: string;
+    userId: string;
+    role: string;
+    createdAt: string;
 };
 
 export type OnboardingStepStatus = {
-  id: string;
-  title: string;
-  completed: boolean;
-  required: boolean;
-  blockingReasons: string[];
+    id: string;
+    title: string;
+    completed: boolean;
+    required: boolean;
+    blockingReasons: string[];
 };
 
 export type StoreOnboardingStatus = {
-  storeId: string;
-  onboardingComplete: boolean;
-  canGoLive: boolean;
-  isActive: boolean;
-  completedRequiredSteps: number;
-  totalRequiredSteps: number;
-  nextStepId: string | null;
-  activeProductCount: number;
-  hasPublishedImport: boolean;
-  steps: OnboardingStepStatus[];
+    storeId: string;
+    onboardingComplete: boolean;
+    canGoLive: boolean;
+    isActive: boolean;
+    completedRequiredSteps: number;
+    totalRequiredSteps: number;
+    nextStepId: string | null;
+    activeProductCount: number;
+    hasPublishedImport: boolean;
+    steps: OnboardingStepStatus[];
 };
 
 export type Category = {
@@ -198,6 +198,7 @@ export type Order = {
     status: OrderStatus;
     subtotalAmount: number;
     taxAmount: number;
+    platformFeeAmount: number;
     totalAmount: number;
     currency: string;
     decimalPlaces: number;
@@ -214,6 +215,17 @@ export type Order = {
     createdAt: string;
     updatedAt: string;
 };
+
+export type OrderLookupResponse = {
+    orderId: string;
+    orderAccessToken: string;
+};
+
+export type CheckoutSession = {
+    clientSecret: string;
+    stripeAccountId: string;
+};
+
 
 export type ImportStatus = "pending" | "processing" | "completed" | "failed" | "published";
 export type ImportItemStatus = "pending" | "mapped" | "ignored";

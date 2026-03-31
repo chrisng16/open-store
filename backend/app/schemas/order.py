@@ -24,6 +24,31 @@ class OrderCreate(BaseModel):
     items: list[OrderItemCreate] = Field(..., min_length=1)
 
 
+class Address(BaseModel):
+    line1: str
+    line2: str | None = None
+    city: str
+    state: str
+    postal_code: str
+    country: str
+
+
+class CheckoutInitiateRequest(BaseModel):
+    items: list[OrderItemCreate]
+    shipping_address: Address
+    customer_name: str
+    customer_email: str
+    customer_phone: str | None = None
+    notes: str | None = None
+
+
+class OrderUpdate(BaseModel):
+    customer_name: str | None = None
+    customer_email: str | None = None
+    customer_phone: str | None = None
+    notes: str | None = None
+
+
 class OrderLookupRequest(BaseModel):
     order_number: str = Field(..., min_length=4, max_length=32)
     email: str | None = None

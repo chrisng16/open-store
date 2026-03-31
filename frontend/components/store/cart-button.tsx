@@ -18,7 +18,7 @@ import { useCartPricing } from "@/lib/cart-pricing";
 import { type CartItem, useCartHydrated, useCartMutations, useCartSummary } from "@/lib/cart-store";
 import { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useCartProductDialogState } from "@/stores/ui-store";
+import { useCartProductDialogState, useCartSheetState } from "@/stores/ui-store";
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -43,6 +43,7 @@ export function CartButton({
         [safeItems]
     );
     const cartProductDialog = useCartProductDialogState();
+    const cartSheet = useCartSheetState();
     const editingItem: CartItem | null =
         (cartProductDialog.itemId
             ? safeItemsById.get(cartProductDialog.itemId) ?? null
@@ -86,7 +87,7 @@ export function CartButton({
                 onClose={cartProductDialog.close}
             />
 
-            <Sheet>
+            <Sheet open={cartSheet.isOpen} onOpenChange={(open) => open ? cartSheet.open() : cartSheet.close()}>
                 <SheetTrigger asChild>
                     <Button
                         className={cn("relative w-16 rounded-full px-6", props.className)}
@@ -177,18 +178,17 @@ export function CartButton({
                                 {isLoading ? <Skeleton className="h-4 w-16" /> : <span>{formatCents(subtotal)}</span>}
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Tax (8%)</span>
-                                {isLoading ? <Skeleton className="h-4 w-12" /> : <span>{formatCents(tax)}</span>}
+                                <span className="text-muted-foreground">Tax</span>
+                                {isLoading ? <Skeleton className="h-4 w-12" /> : <span>Calculated at checkout</span>}
                             </div>
                             <Separator />
                             <div className="flex items-center justify-between text-base font-semibold">
-                                <span>Total</span>
-                                {isLoading ? <Skeleton className="h-5 w-20" /> : <span>{formatCents(total)}</span>}
+                                <span>Subtotal</span>
+                                {isLoading ? <Skeleton className="h-5 w-20" /> : <span>{formatCents(subtotal)}</span>}
                             </div>
                             <p className="pt-1 text-xs text-muted-foreground">
-                                Subtotal and tax are estimated values. Final amounts are recalculated during checkout.
-                            </p>
-                        </div>
+                                Shipping and taxes are calculated during the checkout process.
+                            </p>                        </div>
                         <SheetClose asChild>
                             <Button asChild variant="default" className="w-full" disabled={safeItems.length === 0}>
                                 <Link href={`/store/${slug}/checkout`}>

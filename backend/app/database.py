@@ -29,7 +29,7 @@ _ENV_ENGINE_KWARGS = {
         pool_size=5,
         max_overflow=5,        # 10 max total — enough for local work, not wasteful
         pool_timeout=10,       # Fail fast locally so misconfigs surface immediately
-        echo=True,             # Log SQL in dev for easier debugging
+        echo=False,             # Log SQL in dev for easier debugging
     ),
     "production": dict(
         pool_size=20,

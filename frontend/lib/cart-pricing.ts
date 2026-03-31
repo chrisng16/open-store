@@ -144,8 +144,8 @@ export function useCartPricing({
         () => pricedItems.reduce((sum, item) => sum + item.line_total, 0),
         [pricedItems]
     );
-    const tax = Math.round(subtotal * 0.08);
-    const total = subtotal + tax;
+    const tax = 0;
+    const total = subtotal;
 
     return {
         pricedItems,
