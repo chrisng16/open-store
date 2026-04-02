@@ -41,6 +41,7 @@ type UIState = {
     isCartProductDialogOpen: boolean;
     cartProductDialogItemId: string | null;
     isCartSheetOpen: boolean;
+    menuSearchQuery: string;
     categoryFormData: CategoryDialogFormData;
     productFormData: ProductDialogFormData;
 
@@ -62,6 +63,8 @@ type UIState = {
 
     openCartSheet: () => void;
     closeCartSheet: () => void;
+
+    setMenuSearchQuery: (query: string) => void;
 };
 
 export const emptyCategoryFormData: CategoryDialogFormData = {
@@ -89,6 +92,7 @@ export const useUIStore = create<UIState>((set) => ({
     isCartProductDialogOpen: false,
     cartProductDialogItemId: null,
     isCartSheetOpen: false,
+    menuSearchQuery: "",
     categoryFormData: emptyCategoryFormData,
     productFormData: emptyProductFormData,
 
@@ -145,6 +149,11 @@ export const useUIStore = create<UIState>((set) => ({
     closeCartSheet: () =>
         set({
             isCartSheetOpen: false,
+        }),
+
+    setMenuSearchQuery: (query) =>
+        set({
+            menuSearchQuery: query,
         }),
 }));
 
@@ -209,6 +218,15 @@ export function useCartSheetState() {
             isOpen: state.isCartSheetOpen,
             open: state.openCartSheet,
             close: state.closeCartSheet,
+        }))
+    );
+}
+
+export function useMenuSearchState() {
+    return useUIStore(
+        useShallow((state) => ({
+            query: state.menuSearchQuery,
+            setQuery: state.setMenuSearchQuery,
         }))
     );
 }

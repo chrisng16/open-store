@@ -50,7 +50,7 @@ class OrderUpdate(BaseModel):
 
 
 class OrderLookupRequest(BaseModel):
-    order_number: str = Field(..., min_length=4, max_length=32)
+    order_identifier: str = Field(..., min_length=4, max_length=32)
     email: str | None = None
     phone: str | None = None
 
@@ -104,9 +104,9 @@ class OrderResponse(BaseModel):
     # display_id is what customers see ("K7XP0042").
     # order_reference is for support staff and internal tooling ("20250315-42-K7XP").
     # daily_sequence is exposed so frontends can sort/display the day's count if needed.
-    display_id: str
-    order_reference: str
-    daily_sequence: int
+    display_id: str | None
+    order_reference: str | None
+    daily_sequence: int | None
 
     items: list[OrderItemResponse] = []
     created_at: datetime

@@ -56,7 +56,7 @@ export default async function StoreLayout({
     return (
         <StoreProvider store={store as any}>
             <StoreThemeVars vars={cssVars} />  {/* ← sets vars on :root */}
-            <div style={{ fontFamily: fontStyle }} className="min-h-screen bg-background text-foreground transition-all duration-500">
+            <div style={{ fontFamily: fontStyle }} className="bg-background text-foreground transition-all duration-500">
                 <StoreHeader store={store} slug={slug} />
                 <main>{children}</main>
                 <StoreFooter />

@@ -1,6 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { normalizeResponse } from "@/lib/normalize-response";
+import { Order, Store } from "@/lib/types";
 import { notFound } from "next/navigation";
 import { CartClearer } from "./_components/cart-clearer";
 import { OrderPoller } from "./_components/order-poller";
@@ -8,13 +10,13 @@ import { OrderTracker } from "./_components/order-tracker";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
-async function getStoreBySlug(slug: string) {
+async function getStoreBySlug(slug: string): Promise<Store | null> {
     const res = await fetch(`${API_URL}/stores/slug/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) return null;
     return res.json();
 }
 
-async function getOrder(storeId: string, orderId: string, accessToken?: string) {
+async function getOrder(storeId: string, orderId: string, accessToken?: string): Promise<Order | null> {
     // Standardize on "access" query parameter.
     const query = accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
     const res = await fetch(`${API_URL}/stores/${storeId}/orders/${orderId}${query}`, {
@@ -49,10 +51,10 @@ export default async function OrderPage({
     // payment_intent is appended by Stripe Elements.
     const { access, payment_intent, session_id } = await searchParams;
 
-    const store = await getStoreBySlug(slug);
+    const store = await getStoreBySlug(slug).then((data) => normalizeResponse<Store>(data));
     if (!store) notFound();
 
-    const order = await getOrder(store.id, orderId, access);
+    const order = await getOrder(store.id, orderId, access).then((data) => normalizeResponse<Order>(data));
     if (!order) notFound();
 
     const statusInfo = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.pending;
@@ -72,7 +74,7 @@ export default async function OrderPage({
         <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
             {isSuccess && <CartClearer />}
             {!isTerminal && <OrderPoller status={order.status} />}
-            
+
             {isSuccess && (
                 <div className="mb-6 rounded-2xl bg-green-500/10 border border-green-500/20 p-4 flex items-center gap-3 text-green-600">
                     <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center text-white shrink-0">
@@ -89,7 +91,7 @@ export default async function OrderPage({
 
             <div className="mb-6 rounded-[2rem] border border-border/70 bg-card p-6 text-center shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                    Order #{order.display_id || order.order_reference}
+                    Order {order.displayId}
                 </p>
                 {/* Heading reflects actual order status rather than always
                     showing "Order confirmed" — the webhook may not have fired
@@ -113,20 +115,20 @@ export default async function OrderPage({
                         {order.items?.map((item: {
                             id: string;
                             quantity: number;
-                            product_name: string;
-                            total_amount: number;
-                            options?: { id: string; option_name: string }[];
+                            productName: string;
+                            totalAmount: number;
+                            options?: { id: string; optionName: string }[];
                         }) => (
                             <div key={item.id} className="flex justify-between text-sm">
                                 <div>
-                                    <span>{item.quantity}× {item.product_name}</span>
+                                    <span>{item.quantity}× {item.productName}</span>
                                     {item.options && item.options.length > 0 && (
                                         <p className="text-muted-foreground text-xs">
-                                            {item.options.map((o) => o.option_name).join(", ")}
+                                            {item.options.map((o) => o.optionName).join(", ")}
                                         </p>
                                     )}
                                 </div>
-                                <span>${(Number(item.total_amount) / 100).toFixed(2)}</span>
+                                <span>${(Number(item.totalAmount) / 100).toFixed(2)}</span>
                             </div>
                         ))}
 
@@ -134,40 +136,40 @@ export default async function OrderPage({
 
                         <div className="flex justify-between text-sm">
                             <span>Subtotal</span>
-                            <span>${(Number(order.subtotal_amount) / 100).toFixed(2)}</span>
+                            <span>${(Number(order.subtotalAmount) / 100).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm text-muted-foreground">
                             <span>Tax</span>
-                            <span>${(Number(order.tax_amount) / 100).toFixed(2)}</span>
+                            <span>${(Number(order.taxAmount) / 100).toFixed(2)}</span>
                         </div>
-                        {order.platform_fee_amount > 0 && (
+                        {order.platformFeeAmount > 0 && (
                             <div className="flex justify-between text-sm text-muted-foreground">
                                 <span>Service fee</span>
-                                <span>${(Number(order.platform_fee_amount) / 100).toFixed(2)}</span>
+                                <span>${(Number(order.platformFeeAmount) / 100).toFixed(2)}</span>
                             </div>
                         )}
                         <div className="flex justify-between font-bold">
                             <span>Total</span>
-                            <span>${(Number(order.total_amount) / 100).toFixed(2)}</span>
+                            <span>${(Number(order.totalAmount) / 100).toFixed(2)}</span>
                         </div>
                     </CardContent>
                 </Card>
 
                 <div className="space-y-4 lg:sticky lg:top-28">
-                    {(order.customer_name || order.customer_email) && (
+                    {(order.customerName || order.customerEmail) && (
                         <Card className="rounded-[1.75rem] border-border/70">
                             <CardHeader>
                                 <CardTitle>Customer</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
-                                {order.customer_name && (
-                                    <p><span className="font-medium">Name:</span> {order.customer_name}</p>
+                                {order.customerName && (
+                                    <p><span className="font-medium">Name:</span> {order.customerName}</p>
                                 )}
-                                {order.customer_email && (
-                                    <p><span className="font-medium">Email:</span> {order.customer_email}</p>
+                                {order.customerEmail && (
+                                    <p><span className="font-medium">Email:</span> {order.customerEmail}</p>
                                 )}
-                                {order.customer_phone && (
-                                    <p><span className="font-medium">Phone:</span> {order.customer_phone}</p>
+                                {order.customerPhone && (
+                                    <p><span className="font-medium">Phone:</span> {order.customerPhone}</p>
                                 )}
                                 {order.notes && (
                                     <p><span className="font-medium">Notes:</span> {order.notes}</p>

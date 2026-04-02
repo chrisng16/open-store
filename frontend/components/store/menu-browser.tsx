@@ -2,11 +2,12 @@
 
 import { Badge } from "@/components/ui/badge";
 import { useMenuScrollSpy } from "@/hooks/use-menu-scroll-spy";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useCartMutations } from "@/lib/cart-store";
 import { Product, ProductWithCategoryListItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useCartSheetState, useStorefrontProductDialogState } from "@/stores/ui-store";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { useCartSheetState, useMenuSearchState, useStorefrontProductDialogState } from "@/stores/ui-store";
+import { ChevronLeft, ChevronRight, Plus, SearchX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProductDialog } from "./product-dialog";
@@ -106,7 +107,7 @@ function TabBar({
                         className={cn(
                             "shrink-0 border-b-4 rounded px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors pointer-events-auto",
                             activeSection === section.id
-                                ? "-mb-px border-foreground text-foreground"
+                                ? "border-foreground text-foreground"
                                 : "border-transparent text-muted-foreground hover:text-foreground",
                         )}
                     >
@@ -155,9 +156,33 @@ export function MenuBrowser({
     const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
     const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
+    const isMobile = useIsMobile();
+
     const { setStoreSlug, addItem } = useCartMutations();
     const cartSheet = useCartSheetState();
+    const { query } = useMenuSearchState();
     const storefrontProductDialog = useStorefrontProductDialogState();
+
+    // ─── Filtering logic ──────────────────────────────────────────────────────
+    const filteredSections = useMemo(() => {
+        if (!query.trim()) return sections;
+
+        const keywords = query.toLowerCase().split(/\s+/).filter(Boolean);
+
+        return sections.map(section => {
+            const matchingProducts = section.products.filter(product => {
+                const searchStr = [
+                    product.name,
+                    product.description,
+                    ...(product.dietaryTags || [])
+                ].filter(Boolean).join(" ").toLowerCase();
+
+                return keywords.every(kw => searchStr.includes(kw));
+            });
+
+            return { ...section, products: matchingProducts };
+        }).filter(section => section.products.length > 0);
+    }, [sections, query]);
 
     const totalItems = useMemo(
         () => sections.reduce((sum, s) => sum + s.products.length, 0),
@@ -174,11 +199,11 @@ export function MenuBrowser({
     // The sticky offset is navbarHeight + the reserved compact row slot + the sticky tab bar height + a small gap.
     const getStickyOffset = useCallback(
         () => navbarHeight + (stickyHeaderRef.current?.offsetHeight ?? 0) + 16,
-        [navbarHeight],
+        [navbarHeight, isMobile],
     );
 
     const { activeSection, navigateTo } = useMenuScrollSpy({
-        sections,
+        sections: filteredSections,
         defaultSection: defaultCategory,
         getStickyOffset,
         tabScrollerRef,
@@ -187,7 +212,7 @@ export function MenuBrowser({
     });
 
     return (
-        <div className="container mx-auto px-4 py-3">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
             <ProductDialog
                 open={storefrontProductDialog.isOpen && !!selectedProduct}
                 productId={selectedProduct?.id ?? ""}
@@ -273,36 +298,38 @@ export function MenuBrowser({
             </div>
 
             {/* Sticky tab bar in a separate container below the compact nav slot */}
-            <div
-                ref={stickyHeaderRef}
-                className="sticky z-30 bg-background"
-                style={{ top: navbarHeight - 8 }}
-            >
-                <TabBar
-                    sections={sections}
-                    activeSection={activeSection}
-                    navigateTo={navigateTo}
-                    tabScrollerRef={tabScrollerRef}
-                    tabButtonRefs={tabButtonRefs}
-                />
-            </div>
+            {filteredSections.length > 0 && (
+                <div
+                    ref={stickyHeaderRef}
+                    className="sticky z-30 bg-background"
+                    style={{ top: isMobile ? navbarHeight + 34 : navbarHeight - 8 }}
+                >
+                    <TabBar
+                        sections={filteredSections}
+                        activeSection={activeSection}
+                        navigateTo={navigateTo}
+                        tabScrollerRef={tabScrollerRef}
+                        tabButtonRefs={tabButtonRefs}
+                    />
+                </div>
+            )}
 
             {/* ── Menu sections ── */}
-            <div className="space-y-10 pt-10">
-                {sections.map((section) => (
-                    <section
-                        key={section.id}
-                        ref={(node) => { sectionRefs.current[section.id] = node; }}
-                    >
-                        <header className="mb-4">
-                            <h3 className="text-xl font-bold tracking-tight md:text-2xl">{section.name}</h3>
-                            {section.description && (
-                                <p className="mt-0.5 text-sm text-muted-foreground">{section.description}</p>
-                            )}
-                        </header>
+            <div className="space-y-10 pt-10 min-h-[50vh]">
+                {filteredSections.length > 0 ? (
+                    filteredSections.map((section) => (
+                        <section
+                            key={section.id}
+                            ref={(node) => { sectionRefs.current[section.id] = node; }}
+                        >
+                            <header className="mb-4">
+                                <h3 className="text-xl font-bold tracking-tight md:text-2xl">{section.name}</h3>
+                                {section.description && (
+                                    <p className="mt-0.5 text-sm text-muted-foreground">{section.description}</p>
+                                )}
+                            </header>
 
-                        {section.products.length > 0 ? (
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                 {section.products.map((product) => (
                                     <ProductCard
                                         key={product.id}
@@ -311,11 +338,19 @@ export function MenuBrowser({
                                     />
                                 ))}
                             </div>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">Nothing in this section yet.</p>
-                        )}
-                    </section>
-                ))}
+                        </section>
+                    ))
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in zoom-in duration-300">
+                        <div className="bg-muted/50 p-4 rounded-full mb-4">
+                            <SearchX className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <h3 className="text-lg font-semibold">No items found</h3>
+                        <p className="text-muted-foreground max-w-xs mt-1">
+                            We couldn&apos;t find anything matching &quot;{query}&quot;. Try a different keyword.
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -3,12 +3,15 @@ import string
 import uuid
 import hmac
 import re
+import json
 from hashlib import sha256
 from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select, func, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 
 from app.api.pagination import get_offset_pagination, OffsetPaginationParams, resolve_offset_pagination
 from app.api.sorting import resolve_sort_expression
@@ -149,6 +152,34 @@ def _normalize_phone(value: str | None) -> str | None:
     return digits_only or None
 
 
+def _build_checkout_fingerprint(payload: CheckoutInitiateRequest) -> str:
+    """Create a deterministic fingerprint for checkout idempotency."""
+    normalized_items = []
+    for item in sorted(payload.items, key=lambda i: str(i.product_id)):
+        normalized_options = [
+            {
+                "option_id": str(opt.option_id),
+                "quantity": opt.quantity,
+            }
+            for opt in sorted(item.options, key=lambda o: str(o.option_id))
+        ]
+        normalized_items.append(
+            {
+                "product_id": str(item.product_id),
+                "quantity": item.quantity,
+                "options": normalized_options,
+            }
+        )
+
+    payload_snapshot = {
+        "customer_email": _normalize_email(payload.customer_email),
+        "shipping_address": payload.shipping_address.model_dump(),
+        "items": normalized_items,
+    }
+    serialized = json.dumps(payload_snapshot, sort_keys=True, separators=(",", ":"))
+    return sha256(serialized.encode("utf-8")).hexdigest()
+
+
 # ---------------------------------------------------------------------------
 # Shared filter helper
 # ---------------------------------------------------------------------------
@@ -160,7 +191,13 @@ def _apply_order_filters(
     created_from: date | None,
     created_to: date | None,
     q: str | None,
+    store_timezone: str | None = None,
 ):
+    try:
+        store_tz = ZoneInfo(store_timezone or "UTC")
+    except ZoneInfoNotFoundError:
+        store_tz = timezone.utc
+
     if status:
         valid_statuses = [
             OrderStatus(s.strip())
@@ -170,10 +207,10 @@ def _apply_order_filters(
         if valid_statuses:
             query = query.where(Order.status.in_(valid_statuses))
     if created_from:
-        start_dt = datetime.combine(created_from, time.min).replace(tzinfo=timezone.utc)
+        start_dt = datetime.combine(created_from, time.min, tzinfo=store_tz).astimezone(timezone.utc)
         query = query.where(Order.created_at >= start_dt)
     if created_to:
-        end_dt = datetime.combine(created_to, time.max).replace(tzinfo=timezone.utc)
+        end_dt = datetime.combine(created_to, time.max, tzinfo=store_tz).astimezone(timezone.utc)
         query = query.where(Order.created_at <= end_dt)
     if q:
         term = f"%{q.strip()}%"
@@ -210,6 +247,59 @@ async def initiate_checkout(
 
     if not store.stripe_account_id:
         raise HTTPException(status_code=400, detail="Store is not set up for payments")
+
+    checkout_fingerprint = _build_checkout_fingerprint(payload)
+
+    existing_result = await db.execute(
+        select(Order)
+        .where(
+            Order.store_id == store_id,
+            Order.checkout_fingerprint == checkout_fingerprint,
+            Order.status == OrderStatus.pending_payment,
+        )
+        .order_by(Order.created_at.desc())
+        .limit(1)
+    )
+    existing_order = existing_result.scalar_one_or_none()
+    if existing_order:
+        if existing_order.stripe_payment_intent_id:
+            intent = await update_payment_intent(
+                payment_intent_id=existing_order.stripe_payment_intent_id,
+                amount=existing_order.total_amount,
+                stripe_account=store.stripe_account_id,
+                application_fee_amount=existing_order.platform_fee_amount,
+                metadata={
+                    "order_id": str(existing_order.id),
+                    "store_id": str(store.id),
+                },
+            )
+        else:
+            intent = await create_payment_intent(
+                amount=existing_order.total_amount,
+                stripe_account=store.stripe_account_id,
+                application_fee_amount=existing_order.platform_fee_amount,
+                idempotency_key=f"pi-{existing_order.id}",
+                metadata={
+                    "order_id": str(existing_order.id),
+                },
+            )
+            existing_order.stripe_payment_intent_id = intent.id
+            await db.flush()
+
+        existing_tax_rate = 0.0
+        if existing_order.subtotal_amount > 0:
+            existing_tax_rate = round(existing_order.tax_amount * 100 / existing_order.subtotal_amount, 2)
+
+        return {
+            "client_secret": intent.client_secret,
+            "order_id": existing_order.id,
+            "order_access_token": build_order_access_token(existing_order.id, existing_order.store_id),
+            "subtotal": existing_order.subtotal_amount,
+            "tax": existing_order.tax_amount,
+            "tax_rate": existing_tax_rate,
+            "platform_fee": existing_order.platform_fee_amount,
+            "total": existing_order.total_amount,
+        }
 
     # Security: Lookup real prices for products and options.
     subtotal_amount = 0
@@ -322,33 +412,10 @@ async def initiate_checkout(
     platform_fee_amount = int((subtotal_amount + tax_amount) * platform_fee_percent / 100)
     total_amount = subtotal_amount + tax_amount + platform_fee_amount
 
-    # Daily sequence logic matching create_order
-    today = datetime.now(timezone.utc).date()
-    lock_key = f"{store_id}:{today.isoformat()}"
-    await db.execute(
-        select(func.pg_advisory_xact_lock(func.hashtext(lock_key)))
-    )
-
-    day_start = datetime.combine(today, time.min, tzinfo=timezone.utc)
-    day_end = datetime.combine(today, time.max, tzinfo=timezone.utc)
-
-    result = await db.execute(
-        select(func.coalesce(func.max(Order.daily_sequence), 0)).where(
-            Order.store_id == store_id,
-            Order.created_at >= day_start,
-            Order.created_at <= day_end,
-        )
-    )
-    daily_seq = (result.scalar() or 0) + 1
-
-    token = _generate_order_token()
-    order_reference = build_order_reference(today, daily_seq, token)
-    display_id = build_display_id(daily_seq, token)
-
     order = Order(
         store_id=store_id,
         customer_id=user.id if user else None,
-        status=OrderStatus.pending,
+        status=OrderStatus.pending_payment,
         subtotal_amount=subtotal_amount,
         tax_amount=tax_amount,
         platform_fee_amount=platform_fee_amount,
@@ -358,13 +425,65 @@ async def initiate_checkout(
         customer_email=payload.customer_email,
         customer_phone=payload.customer_phone,
         notes=payload.notes,
-        daily_sequence=daily_seq,
-        order_token=token,
-        order_reference=order_reference,
-        display_id=display_id,
+        checkout_fingerprint=checkout_fingerprint,
     )
     db.add(order)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        conflict_result = await db.execute(
+            select(Order)
+            .where(
+                Order.store_id == store_id,
+                Order.checkout_fingerprint == checkout_fingerprint,
+                Order.status == OrderStatus.pending_payment,
+            )
+            .order_by(Order.created_at.desc())
+            .limit(1)
+        )
+        conflict_order = conflict_result.scalar_one_or_none()
+        if not conflict_order:
+            raise HTTPException(status_code=409, detail="Checkout is being processed, please retry")
+
+        if conflict_order.stripe_payment_intent_id:
+            intent = await update_payment_intent(
+                payment_intent_id=conflict_order.stripe_payment_intent_id,
+                amount=conflict_order.total_amount,
+                stripe_account=store.stripe_account_id,
+                application_fee_amount=conflict_order.platform_fee_amount,
+                metadata={
+                    "order_id": str(conflict_order.id),
+                    "store_id": str(store.id),
+                },
+            )
+        else:
+            intent = await create_payment_intent(
+                amount=conflict_order.total_amount,
+                stripe_account=store.stripe_account_id,
+                application_fee_amount=conflict_order.platform_fee_amount,
+                idempotency_key=f"pi-{conflict_order.id}",
+                metadata={
+                    "order_id": str(conflict_order.id),
+                },
+            )
+            conflict_order.stripe_payment_intent_id = intent.id
+            await db.flush()
+
+        existing_tax_rate = 0.0
+        if conflict_order.subtotal_amount > 0:
+            existing_tax_rate = round(conflict_order.tax_amount * 100 / conflict_order.subtotal_amount, 2)
+
+        return {
+            "client_secret": intent.client_secret,
+            "order_id": conflict_order.id,
+            "order_access_token": build_order_access_token(conflict_order.id, conflict_order.store_id),
+            "subtotal": conflict_order.subtotal_amount,
+            "tax": conflict_order.tax_amount,
+            "tax_rate": existing_tax_rate,
+            "platform_fee": conflict_order.platform_fee_amount,
+            "total": conflict_order.total_amount,
+        }
 
     for order_item, option_models in order_items_to_create:
         order_item.order_id = order.id
@@ -421,32 +540,6 @@ async def create_order(
         response.headers["X-Store-Onboarding-Warning"] = (
             f"Store onboarding incomplete. Next required step: {onboarding_status.next_step_id or 'unknown'}"
         )
-
-    today = datetime.now(timezone.utc).date()
-
-    # Scope the advisory lock to store + date so stores don't block each other
-    # across days, and so the sequence resets cleanly each UTC day.
-    lock_key = f"{store_id}:{today.isoformat()}"
-    await db.execute(
-        select(func.pg_advisory_xact_lock(func.hashtext(lock_key)))
-    )
-
-    # Daily sequence: counts only today's orders for this store.
-    day_start = datetime.combine(today, time.min, tzinfo=timezone.utc)
-    day_end = datetime.combine(today, time.max, tzinfo=timezone.utc)
-
-    result = await db.execute(
-        select(func.coalesce(func.max(Order.daily_sequence), 0)).where(
-            Order.store_id == store_id,
-            Order.created_at >= day_start,
-            Order.created_at <= day_end,
-        )
-    )
-    daily_seq = (result.scalar() or 0) + 1
-
-    token = _generate_order_token()
-    order_reference = build_order_reference(today, daily_seq, token)
-    display_id = build_display_id(daily_seq, token)
 
     product_ids = {item.product_id for item in data.items}
     products_result = await db.execute(
@@ -534,7 +627,7 @@ async def create_order(
     order = Order(
         store_id=store_id,
         customer_id=user.id if user else None,
-        status=OrderStatus.pending,
+        status=OrderStatus.pending_payment,
         subtotal_amount=subtotal_amount,
         tax_amount=tax_amount,
         platform_fee_amount=platform_fee_amount,
@@ -545,11 +638,6 @@ async def create_order(
         customer_email=data.customer_email,
         customer_phone=data.customer_phone,
         notes=data.notes,
-        # New identifier fields — requires a migration adding these columns.
-        daily_sequence=daily_seq,
-        order_token=token,
-        order_reference=order_reference,   # "20250315-K7XP-0042"  — internal
-        display_id=display_id,             # "K7XP-0042"           — customer-facing
     )
     db.add(order)
     await db.flush()
@@ -633,6 +721,7 @@ async def list_orders(
         created_from=created_from,
         created_to=created_to,
         q=q,
+        store_timezone=ctx.store.timezone,
     )
 
     total_result = await db.execute(
@@ -644,7 +733,7 @@ async def list_orders(
     sort_expression, sort_field, is_desc = resolve_sort_expression(
         sort,
         allowed_columns={
-            "orderNumber": Order.daily_sequence,
+            "displayId": Order.daily_sequence,
             "status": Order.status,
             "totalAmount": Order.total_amount,
             "createdAt": Order.created_at,
@@ -666,6 +755,7 @@ async def list_orders(
             created_from=created_from,
             created_to=created_to,
             q=q,
+            store_timezone=ctx.store.timezone,
         )
         .options(selectinload(Order.items).selectinload(OrderItem.options))
         .order_by(*order_by_expressions)
@@ -692,7 +782,7 @@ async def lookup_order(
     payload: OrderLookupRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    lookup_value = payload.order_number.strip().upper()
+    lookup_value = payload.order_identifier.strip().upper()
     normalized_email = _normalize_email(payload.email)
     normalized_phone = _normalize_phone(payload.phone)
 
@@ -811,10 +901,10 @@ async def update_order(
         raise HTTPException(status_code=403, detail="Not allowed to update this order")
 
     # Guard: only pending orders can be updated.
-    if order.status != OrderStatus.pending:
+    if order.status != OrderStatus.pending_payment:
         raise HTTPException(
             status_code=400,
-            detail="Only pending orders can be updated.",
+            detail="Only pending payment orders can be updated.",
         )
 
     # Apply updates

@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import String, Text, Integer, ForeignKey, Enum, UniqueConstraint, Index
+from sqlalchemy import String, Text, Integer, ForeignKey, Enum, UniqueConstraint, Index, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import inspect
@@ -9,6 +9,7 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 class OrderStatus(str, enum.Enum):
     pending = "pending"
+    pending_payment = "pending_payment"
     confirmed = "confirmed"
     preparing = "preparing"
     ready = "ready"
@@ -31,6 +32,14 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Index("ix_orders_order_reference", "order_reference", unique=True),
         # Non-unique index on display_id so customer-facing search is fast.
         Index("ix_orders_display_id", "display_id"),
+        # Deterministic checkout idempotency for active pending orders.
+        Index(
+            "uq_orders_active_checkout_fingerprint",
+            "store_id",
+            "checkout_fingerprint",
+            unique=True,
+            postgresql_where=sa_text("status = 'pending_payment'::orderstatus"),
+        ),
     )
 
     store_id: Mapped[uuid.UUID] = mapped_column(
@@ -38,7 +47,7 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     customer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     status: Mapped[OrderStatus] = mapped_column(
-        Enum(OrderStatus), nullable=False, default=OrderStatus.pending
+        Enum(OrderStatus), nullable=False, default=OrderStatus.pending_payment
     )
     subtotal_amount: Mapped[int] = mapped_column(Integer, nullable=False)
     tax_amount: Mapped[int] = mapped_column(Integer, default=0)
@@ -51,6 +60,7 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     customer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     customer_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    checkout_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     # ------------------------------------------------------------------
     # Order identification — replaces the old all-time `order_number`.
@@ -74,10 +84,10 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     #                                 Format: "<token>-<seq>"
     #                                 e.g.    "K7XP-0042"
     # ------------------------------------------------------------------
-    daily_sequence: Mapped[int] = mapped_column(Integer, nullable=False)
-    order_token: Mapped[str] = mapped_column(String(8), nullable=False)
-    order_reference: Mapped[str] = mapped_column(String(32), nullable=False)
-    display_id: Mapped[str] = mapped_column(String(16), nullable=False)
+    daily_sequence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    order_token: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    order_reference: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    display_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     # Relationships
     store: Mapped["Store"] = relationship(back_populates="orders")

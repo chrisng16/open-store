@@ -149,6 +149,18 @@ async def update_payment_intent(
     )
 
 
+async def retrieve_payment_intent(
+    payment_intent_id: str,
+    stripe_account: str,
+) -> stripe.PaymentIntent:
+    """Retrieve an existing PaymentIntent from a connected account."""
+    _init_stripe()
+    return stripe.PaymentIntent.retrieve(
+        payment_intent_id,
+        stripe_account=stripe_account,
+    )
+
+
 async def create_checkout_session(
     line_items: list[Any],
     stripe_account: str,

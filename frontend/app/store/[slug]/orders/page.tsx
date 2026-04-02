@@ -16,7 +16,7 @@ export default function OrderLookupPage() {
     const slug = params.slug;
     const store = useStore();
 
-    const [orderNumber, setOrderNumber] = useState("");
+    const [orderIdentifier, setOrderIdentifier] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
     const [loading, setLoading] = useState(false);
@@ -26,7 +26,7 @@ export default function OrderLookupPage() {
         event.preventDefault();
         setError(null);
 
-        const normalizedOrder = orderNumber.trim();
+        const normalizedOrder = orderIdentifier.trim();
         const normalizedEmail = email.trim();
         const normalizedPhone = phone.trim();
 
@@ -43,7 +43,7 @@ export default function OrderLookupPage() {
         setLoading(true);
         try {
             const lookup = await api.orders.lookup(store.id, {
-                orderNumber: normalizedOrder,
+                orderIdentifier: normalizedOrder,
                 email: normalizedEmail || undefined,
                 phone: normalizedPhone || undefined,
             });
@@ -77,8 +77,8 @@ export default function OrderLookupPage() {
                             <Label htmlFor="order-number">Order number</Label>
                             <Input
                                 id="order-number"
-                                value={orderNumber}
-                                onChange={(e) => setOrderNumber(e.target.value)}
+                                value={orderIdentifier}
+                                onChange={(e) => setOrderIdentifier(e.target.value)}
                                 placeholder="Example: K7XP-0042 or 20250315-K7XP-0042"
                                 autoCapitalize="characters"
                             />

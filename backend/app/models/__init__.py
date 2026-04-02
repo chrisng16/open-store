@@ -5,6 +5,7 @@ from app.models.order import Order, OrderItem, OrderItemOption
 from app.models.menu_import import MenuImport, MenuImportItem
 from app.models.upload import UploadAsset
 from app.models.audit import AuditLog
+from app.models.payment_event import PaymentEvent
 
 __all__ = [
     "Base",
@@ -25,4 +26,5 @@ __all__ = [
     "MenuImportItem",
     "UploadAsset",
     "AuditLog",
+    "PaymentEvent",
 ]

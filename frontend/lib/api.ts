@@ -117,8 +117,10 @@ export const api = {
             apiRequest<T.OrderLookupResponse>(`/stores/${storeId}/orders/lookup`, { method: "POST", body: data }),
         list: (storeId: string, token: string, statusFilter?: string) =>
             apiRequest<{ items: T.Order[] }>(`/stores/${storeId}/orders?page=1&page_size=500${statusFilter ? `&status=${statusFilter}` : ""}`, { token }).then((response) => response.items),
-        get: (storeId: string, orderId: string) =>
-            apiRequest<T.Order>(`/stores/${storeId}/orders/${orderId}`),
+        get: (storeId: string, orderId: string, accessToken?: string) =>
+            apiRequest<T.Order>(
+                `/stores/${storeId}/orders/${orderId}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`
+            ),
         updateStatus: (storeId: string, orderId: string, status: string, token: string) =>
             apiRequest<T.Order>(`/stores/${storeId}/orders/${orderId}/status`, { method: "PATCH", body: { status }, token }),
     },

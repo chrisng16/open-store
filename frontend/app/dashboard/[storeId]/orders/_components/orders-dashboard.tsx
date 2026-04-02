@@ -60,7 +60,7 @@ import {
     Search,
     X
 } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 
@@ -71,7 +71,7 @@ type StoreSummary = {
 };
 
 type OrderStatus =
-    | "pending"
+    | "pending_payment"
     | "confirmed"
     | "preparing"
     | "ready"
@@ -96,7 +96,9 @@ type OrderItem = {
 
 type Order = {
     id: string;
-    orderNumber: number;
+    displayId: string | null;
+    orderReference: string | null;
+    dailySequence: number | null;
     status: OrderStatus;
     subtotalAmount: number;
     taxAmount: number;
@@ -134,12 +136,8 @@ type OrdersFilters = {
     pageSize: number;
 };
 
-type SearchParamsReader = {
-    get(name: string): string | null;
-};
-
 const STATUS_OPTIONS: OrderStatus[] = [
-    "pending",
+    "pending_payment",
     "confirmed",
     "preparing",
     "ready",
@@ -160,10 +158,10 @@ const RANGE_OPTIONS: { value: RangePreset; label: string }[] = [
 ];
 
 const DEFAULT_RANGE: RangePreset = "today";
-const ORDER_SORTABLE_COLUMNS = ["orderNumber", "status", "totalAmount", "createdAt", "customer"] as const;
+const ORDER_SORTABLE_COLUMNS = ["displayId", "status", "totalAmount", "createdAt", "customer"] as const;
 const DEFAULT_ORDER_SORT = { id: "createdAt", desc: true } as const;
 
-function parseOrdersFilters(searchParams: SearchParamsReader): OrdersFilters {
+function parseOrdersFilters(searchParams: URLSearchParams): OrdersFilters {
     const rawRange = searchParams.get("range");
     const range = RANGE_OPTIONS.some((option) => option.value === rawRange)
         ? (rawRange as RangePreset)
@@ -273,12 +271,15 @@ function formatCurrency(amount: number, currency = "USD", decimalPlaces = 2) {
 }
 
 function formatStatusLabel(status: OrderStatus) {
+    if (status === "pending_payment") {
+        return "Pending Payment";
+    }
     return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 function getStatusBadgeClassName(status: OrderStatus) {
     switch (status) {
-        case "pending":
+        case "pending_payment":
             return "border-amber-200 bg-amber-50 text-amber-700";
         case "confirmed":
             return "border-sky-200 bg-sky-50 text-sky-700";
@@ -603,7 +604,7 @@ function getOrdersTableColumns({
 }): ColumnDef<Order>[] {
     return [
         {
-            accessorKey: "orderNumber",
+            accessorKey: "displayId",
             size: 88,
             minSize: 80,
             maxSize: 100,
@@ -611,8 +612,8 @@ function getOrdersTableColumns({
                 <DataTableColumnHeader column={column} title="Order" className="-ml-2" />
             ),
             cell: ({ row }) => (
-                <span className="flex w-full ml-3">
-                    #{row.original.orderNumber}
+                <span className="flex w-full font-mono text-[11px] font-bold">
+                    {row.original.displayId ?? "Pending"}
                 </span>
             ),
         },
@@ -741,9 +742,9 @@ function OrderDetailsSheet({
                         <SheetHeader className="border-b px-6 py-5">
                             <div className="flex items-start justify-between gap-4 pr-8">
                                 <div className="space-y-2">
-                                    <SheetTitle className="text-xl">Order #{order.orderNumber}</SheetTitle>
+                                    <SheetTitle className="text-xl">Order {order.displayId}</SheetTitle>
                                     <SheetDescription>
-                                        Placed {formatDateTime(order.createdAt)}
+                                        ID: {order.orderReference ?? "Not assigned yet"} • Placed {formatDateTime(order.createdAt)}
                                     </SheetDescription>
                                 </div>
                                 <Badge variant="outline" className={cn("h-6 px-2", getStatusBadgeClassName(order.status))}>
@@ -1051,7 +1052,6 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
         }),
         [debouncedSearchQuery, filters]
     );
-    const deferredFilters = useDeferredValue(queryFilters);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
@@ -1063,33 +1063,15 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
     });
 
     const ordersQuery = useQuery({
-        queryKey: buildListQueryKey("orders", storeId, toQueryShape(deferredFilters)),
+        queryKey: buildListQueryKey("orders", storeId, toQueryShape(queryFilters)),
         queryFn: async () => {
-            const params = toApiParams(deferredFilters);
+            const params = toApiParams(queryFilters);
             return fetchWithAccessToken<PaginatedResponse<Order>>(`/stores/${storeId}/orders?${params}`);
         },
         enabled: !!storeId,
         refetchInterval: 30_000,
         refetchIntervalInBackground: true,
     });
-
-    useEffect(() => {
-        if (!ordersQuery.data) {
-            return;
-        }
-
-        if (
-            ordersQuery.data.page === filters.page &&
-            ordersQuery.data.pageSize === filters.pageSize
-        ) {
-            return;
-        }
-        updateFilters((current) => ({
-            ...current,
-            page: ordersQuery.data.page,
-            pageSize: ordersQuery.data.pageSize,
-        }));
-    }, [ordersQuery.data, updateFilters]);
 
     function setSearchQuery(value: string) {
         updateFilters((current) => ({
@@ -1210,7 +1192,7 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
             toast.error(error instanceof Error ? error.message : "Failed to update order status");
         },
         onSuccess: (order) => {
-            toast.success(`Order #${order.orderNumber} marked ${formatStatusLabel(order.status).toLowerCase()}`);
+            toast.success(`Order ${order.displayId ?? order.id} marked ${formatStatusLabel(order.status).toLowerCase()}`);
         },
         onSettled: async () => {
             setUpdatingOrderId(null);

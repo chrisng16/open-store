@@ -819,9 +819,9 @@ export type OrderItemResponse = {
  */
 export type OrderLookupRequest = {
     /**
-     * Order Number
+     * Order Identifier
      */
-    orderNumber: string;
+    orderIdentifier: string;
     /**
      * Email
      */

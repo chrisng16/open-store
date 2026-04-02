@@ -2,7 +2,6 @@
 
 import { ProductDialog } from "@/components/store/product-dialog";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
     Sheet,
     SheetClose,
@@ -90,7 +89,7 @@ export function CartButton({
             <Sheet open={cartSheet.isOpen} onOpenChange={(open) => open ? cartSheet.open() : cartSheet.close()}>
                 <SheetTrigger asChild>
                     <Button
-                        className={cn("relative w-16 rounded-full px-6", props.className)}
+                        className={cn("relative rounded-full", props.className)}
                         {...props}
                     >
                         <ShoppingCart className="size-4.5" />
@@ -172,7 +171,7 @@ export function CartButton({
                     </div>
 
                     <SheetFooter className="border-t pt-0">
-                        <div className="space-y-2 px-0 pb-0 pt-2 text-sm">
+                        <div className="space-y-2 px-0 py-2 text-sm">
                             <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground">Subtotal</span>
                                 {isLoading ? <Skeleton className="h-4 w-16" /> : <span>{formatCents(subtotal)}</span>}
@@ -181,14 +180,7 @@ export function CartButton({
                                 <span className="text-muted-foreground">Tax</span>
                                 {isLoading ? <Skeleton className="h-4 w-12" /> : <span>Calculated at checkout</span>}
                             </div>
-                            <Separator />
-                            <div className="flex items-center justify-between text-base font-semibold">
-                                <span>Subtotal</span>
-                                {isLoading ? <Skeleton className="h-5 w-20" /> : <span>{formatCents(subtotal)}</span>}
-                            </div>
-                            <p className="pt-1 text-xs text-muted-foreground">
-                                Shipping and taxes are calculated during the checkout process.
-                            </p>                        </div>
+                        </div>
                         <SheetClose asChild>
                             <Button asChild variant="default" className="w-full" disabled={safeItems.length === 0}>
                                 <Link href={`/store/${slug}/checkout`}>

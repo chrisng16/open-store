@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useIsMobile } from "./use-mobile";
 
 interface Section {
     id: string;
@@ -33,6 +34,8 @@ export function useMenuScrollSpy({
     tabButtonRefs,
 }: UseMenuScrollSpyOptions): UseMenuScrollSpyReturn {
     const [activeSection, setActiveSection] = useState(defaultSection);
+
+    const isMobile = useIsMobile();
 
     // Suppress scroll-spy while a programmatic scroll is animating.
     const isProgrammaticScrollRef = useRef(false);
@@ -85,7 +88,7 @@ export function useMenuScrollSpy({
     //
     // Runs once per animation frame (via rAF gate on the scroll event).
     // Picks the section with the most pixels visible in the detection band
-    // (from sticky offset → 30 % of viewport height). This keeps a tall
+    // (from sticky offset → 20 % of viewport height). This keeps a tall
     // section active the entire time the user scrolls through it.
 
     const runScrollSpy = useCallback(() => {
@@ -96,7 +99,7 @@ export function useMenuScrollSpy({
         const bandBottom = window.innerHeight * 0.2;
 
         let bestId = sections[0].id;
-        let bestVisible = -1;
+        let bestVisible = -Infinity;
 
         for (const section of sections) {
             const el = sectionRefs.current?.[section.id];
@@ -161,8 +164,7 @@ export function useMenuScrollSpy({
             const target = sectionRefs.current?.[sectionId];
             if (!target) return;
 
-            const top = window.scrollY + target.getBoundingClientRect().top - getStickyOffset();
-            console.log("Scrolling to", sectionId, "at", top, getStickyOffset());
+            const top = window.scrollY + target.getBoundingClientRect().top - getStickyOffset() - (isMobile ? 30 : -10);
             window.scrollTo({ top, behavior: "smooth" });
 
             // Small delay so scrollY has started moving before we begin polling.
