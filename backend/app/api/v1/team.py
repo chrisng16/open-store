@@ -1,4 +1,5 @@
 import uuid
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -31,10 +32,19 @@ from app.schemas.team import (
     TeamRoleUpdate,
 )
 from app.services.supabase_admin import get_supabase_user_profiles
-from app.services.team import build_invite_link, generate_invite_token, invite_expiration
+from app.services.email import enqueue_store_invitation_email
+from app.config import get_settings
+from app.services.team import build_invite_link, generate_invite_token, invite_expiration, utcnow
 
 store_router = APIRouter(prefix="/stores/{store_id}", tags=["team"])
 accept_router = APIRouter(prefix="/team", tags=["team"])
+logger = logging.getLogger(__name__)
+
+
+def _serialize_invite(invite: StoreInvite) -> TeamInviteResponse:
+    payload = TeamInviteResponse.model_validate(invite).model_dump(exclude={"invite_link"})
+    payload["invite_link"] = build_invite_link(invite.token)
+    return TeamInviteResponse(**payload)
 
 
 def _serialize_role(role: StoreRole) -> TeamRoleResponse:
@@ -347,13 +357,7 @@ async def list_store_invites(
         .order_by(StoreInvite.created_at.desc())
     )
     invites = result.scalars().all()
-    return [
-        TeamInviteResponse(
-            **TeamInviteResponse.model_validate(invite).model_dump(),
-            invite_link=build_invite_link(invite.token),
-        )
-        for invite in invites
-    ]
+    return [_serialize_invite(invite) for invite in invites]
 
 
 @store_router.post("/invites", response_model=TeamInviteResponse, status_code=status.HTTP_201_CREATED)
@@ -361,7 +365,7 @@ async def create_store_invite(
     store_id: uuid.UUID,
     data: TeamInviteCreate,
     user: CurrentUser = Depends(get_current_user),
-    _: StoreContext = Depends(require_permission("team.invites.write")),
+    ctx: StoreContext = Depends(require_permission("team.invites.write")),
     db: AsyncSession = Depends(get_db),
 ):
     if data.role == MemberRole.owner:
@@ -395,9 +399,24 @@ async def create_store_invite(
     await db.flush()
     await db.refresh(invite)
 
-    payload = TeamInviteResponse.model_validate(invite).model_dump()
-    payload["invite_link"] = build_invite_link(invite.token)
-    return TeamInviteResponse(**payload)
+    invite_link = build_invite_link(invite.token)
+    email_enqueued = await enqueue_store_invitation_email(
+        normalized_email,
+        store_name=ctx.store.name,
+        inviter_email=user.email,
+        invite_link=invite_link,
+        role=invite.role.value,
+        expires_at=invite.expires_at.isoformat(),
+    )
+    if not email_enqueued and get_settings().email_enabled:
+        logger.warning(
+            "failed to enqueue invitation email store_id=%s invite_id=%s recipient=%s",
+            store_id,
+            invite.id,
+            normalized_email,
+        )
+
+    return _serialize_invite(invite)
 
 
 @store_router.delete("/invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -431,7 +450,7 @@ async def accept_store_invite(
     if not invite:
         raise HTTPException(status_code=404, detail="Invite not found")
 
-    now = datetime.now(timezone.utc)
+    now = utcnow()
     if invite.status != InviteStatus.pending:
         raise HTTPException(status_code=400, detail="Invite is no longer pending")
 

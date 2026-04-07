@@ -4,6 +4,7 @@ import uuid
 import hmac
 import re
 import json
+import logging
 from hashlib import sha256
 from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -43,8 +44,10 @@ from app.services.stripe_service import (
     update_payment_intent,
 )
 from app.services.onboarding import get_store_onboarding_status
+from app.services.email import enqueue_order_status_update_email
 
 router = APIRouter(prefix="/stores/{store_id}", tags=["orders"])
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -938,7 +941,23 @@ async def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    previous_status = order.status
     order.status = data.status
     await db.flush()
+
+    if previous_status != order.status and order.customer_email:
+        email_enqueued = await enqueue_order_status_update_email(
+            order.customer_email,
+            order=order,
+            store_name=ctx.store.name,
+            previous_status=previous_status,
+        )
+        if not email_enqueued:
+            logger.warning(
+                "failed to enqueue order status update email order_id=%s recipient=%s",
+                order.id,
+                order.customer_email,
+            )
+
     await db.refresh(order, attribute_names=["updated_at"])
     return order

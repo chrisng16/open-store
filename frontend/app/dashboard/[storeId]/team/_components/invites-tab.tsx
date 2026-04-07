@@ -11,8 +11,10 @@ type InvitesTabProps = {
     canManageInvites: boolean;
     isRevoking: boolean;
     feedback: string | null;
+    loadError: string | null;
     onRevokeInvite: (inviteId: string) => void;
     onFeedback: (value: string | null) => void;
+    onRetry: () => void;
 };
 
 export function InvitesTab({
@@ -20,8 +22,10 @@ export function InvitesTab({
     canManageInvites,
     isRevoking,
     feedback,
+    loadError,
     onRevokeInvite,
     onFeedback,
+    onRetry,
 }: InvitesTabProps) {
     return (
         <div className="space-y-4">
@@ -30,8 +34,16 @@ export function InvitesTab({
                     <CardTitle>Invitations</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                    {pendingInvites.length === 0 ? <p className="text-sm text-muted-foreground">No invites yet.</p> : null}
-                    {pendingInvites.map((invite) => (
+                    {loadError ? (
+                        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                            <p className="text-sm text-destructive">{loadError}</p>
+                            <Button type="button" variant="outline" className="mt-3" onClick={onRetry}>
+                                Retry
+                            </Button>
+                        </div>
+                    ) : null}
+                    {!loadError && pendingInvites.length === 0 ? <p className="text-sm text-muted-foreground">No invites yet.</p> : null}
+                    {!loadError && pendingInvites.map((invite) => (
                         <div key={invite.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
                             <div className="space-y-1">
                                 <div className="font-medium">{invite.invitedEmail}</div>

@@ -164,10 +164,16 @@ export default function TeamPage({
                 role: inviteRole,
             }),
         onSuccess: async (invite) => {
-            setFeedback(`Invite created for ${invite.invitedEmail}`);
             setInviteEmail("");
             setInviteDialogOpen(false);
-            await invitesQuery.refetch();
+
+            const refreshResult = await invitesQuery.refetch();
+            if (refreshResult.error) {
+                setFeedback(`Invite created for ${invite.invitedEmail}, but the invites list failed to refresh.`);
+                return;
+            }
+
+            setFeedback(`Invite created for ${invite.invitedEmail}`);
         },
         onError: (error) => {
             setFeedback(error instanceof Error ? error.message : "Failed to create invite");
@@ -230,6 +236,7 @@ export default function TeamPage({
 
     const isLoading = membersQuery.isPending || rolesQuery.isPending || invitesQuery.isPending;
     const pendingInvites = (invitesQuery.data ?? []).filter((invite) => invite.status === "pending");
+    const inviteQueryError = invitesQuery.error instanceof Error ? invitesQuery.error.message : null;
 
     const discardCurrentTab = () => {
         if (activeTab === "members") {
@@ -398,8 +405,12 @@ export default function TeamPage({
                             canManageInvites={canManageInvites}
                             isRevoking={revokeMutation.isPending}
                             feedback={feedback}
+                            loadError={inviteQueryError}
                             onRevokeInvite={(inviteId) => revokeMutation.mutate(inviteId)}
                             onFeedback={setFeedback}
+                            onRetry={() => {
+                                void invitesQuery.refetch();
+                            }}
                         />
                     </TabsContent>
                 </Tabs>

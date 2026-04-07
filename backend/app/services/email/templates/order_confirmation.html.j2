@@ -1,0 +1,9 @@
+<html>
+  <body>
+    <p>Hello {{ customer_name }},</p>
+    <p>Your order <strong>{{ order_display_id }}</strong> at <strong>{{ store_name }}</strong> is now <strong>{{ status }}</strong>.</p>
+    <p>Total: <strong>{{ total_amount_display }}</strong></p>
+    {% if order_reference %}<p>Reference: {{ order_reference }}</p>{% endif %}
+    <p>Thanks for ordering with Open Store.</p>
+  </body>
+</html>

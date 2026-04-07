@@ -1,6 +1,7 @@
 import uuid
 import secrets
 import string
+import logging
 from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
@@ -26,8 +27,10 @@ from app.services.stripe_service import (
     retrieve_payment_intent,
     update_payment_intent,
 )
+from app.services.email import enqueue_order_confirmation_email
 
 router = APIRouter(tags=["payments"])
+logger = logging.getLogger(__name__)
 
 
 def _generate_order_token(length: int = 4) -> str:
@@ -344,6 +347,7 @@ async def stripe_webhook(
             order = result.scalar_one_or_none()
 
         if order:
+            status_before = order.status
             if order.status == OrderStatus.pending_payment:
                 order.status = OrderStatus.confirmed
                 await _assign_confirmed_order_identifiers(db, order)
@@ -351,6 +355,24 @@ async def stripe_webhook(
                 order.stripe_payment_intent_id = pi["id"]
             payment_event.order_id = order.id
             await db.flush()
+
+            # Send confirmation only when we transition into confirmed.
+            if status_before == OrderStatus.pending_payment and order.customer_email:
+                store_result = await db.execute(
+                    select(Store.name).where(Store.id == order.store_id)
+                )
+                store_name = store_result.scalar_one_or_none() or "Your store"
+                email_enqueued = await enqueue_order_confirmation_email(
+                    order.customer_email,
+                    order=order,
+                    store_name=store_name,
+                )
+                if not email_enqueued:
+                    logger.warning(
+                        "failed to enqueue order confirmation email order_id=%s recipient=%s",
+                        order.id,
+                        order.customer_email,
+                    )
 
     elif event_type == "payment_intent.payment_failed":
         obj = event["data"]["object"]

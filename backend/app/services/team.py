@@ -54,8 +54,12 @@ def generate_invite_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def invite_expiration() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(days=INVITE_TTL_DAYS)
+    return utcnow() + timedelta(days=INVITE_TTL_DAYS)
 
 
 def build_invite_link(token: str) -> str:

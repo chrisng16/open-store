@@ -23,6 +23,7 @@ from app.database import async_session_factory
 from app.models.menu_import import MenuImport, MenuImportItem, ImportStatus, ImportItemStatus
 from app.models.upload import UploadAsset, UploadAssetStatus
 from app.services.ai.menu_parser import parse_menu_file
+from app.services.email import EmailTemplateKey, send_template_email
 from app.services.storage import delete_file
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 QUEUE_AI = "menu_imports"
 QUEUE_MAINTENANCE = "maintenance"
+QUEUE_EMAIL = "emails"
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +175,28 @@ async def cleanup_stale_uploads_task(ctx: dict) -> dict:
         return {"status": "ok", "expired_count": expired, "failed_deletes": failed_deletes}
 
 
+async def send_email_task(
+    ctx: dict,
+    template_key: EmailTemplateKey,
+    recipient: str,
+    context: dict,
+) -> dict:
+    """Background task: render and send a transactional email via SMTP."""
+    logger.info(
+        "send_email_task started template=%s recipient=%s",
+        template_key,
+        recipient,
+    )
+    result = await send_template_email(template_key, recipient, context)
+    logger.info(
+        "send_email_task finished template=%s recipient=%s status=%s",
+        template_key,
+        recipient,
+        result.get("status"),
+    )
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Lifecycle hooks
 # ---------------------------------------------------------------------------
@@ -260,6 +284,22 @@ class MaintenanceWorkerSettings:
     # Single process, low stakes — 300s is fine. If it crashes your cron
     # simply misses one run, which is acceptable for hourly cleanup.
     health_check_interval = 300
+
+    redis_settings = _redis_settings
+
+
+class EmailWorkerSettings:
+    """Worker for transactional email delivery jobs."""
+
+    functions = [send_email_task]
+    on_startup = startup
+    on_shutdown = shutdown
+
+    queue_name = QUEUE_EMAIL
+    max_jobs = 20
+    job_timeout = 60  # seconds
+    poll_delay = 2.0
+    health_check_interval = 60
 
     redis_settings = _redis_settings
 

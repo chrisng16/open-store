@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     stripe_platform_fee_percent: float = 5.0
 
+    # Email SMTP
+    email_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_use_tls: bool = True
+    smtp_timeout_seconds: int = 15
+
     # Gemini AI
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"

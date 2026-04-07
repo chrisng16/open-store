@@ -1,0 +1,14 @@
+<html>
+  <body>
+    <p>Hello,</p>
+    <p>
+      <strong>{{ inviter_email }}</strong> invited <strong>{{ invited_email }}</strong>
+      to join <strong>{{ store_name }}</strong> as <strong>{{ role }}</strong>.
+    </p>
+    <p>
+      <a href="{{ invite_link }}">Accept invitation</a>
+    </p>
+    <p>This invitation expires on {{ expires_at }}.</p>
+    <p>If you were not expecting this invite, you can ignore this message.</p>
+  </body>
+</html>

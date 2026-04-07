@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-web dev-worker dev-worker-ai dev-worker-maintenance dev-all \
+.PHONY: dev dev-api dev-web dev-worker dev-worker-ai dev-worker-maintenance dev-worker-email dev-all \
 	kill-backend kill-frontend kill-worker kill-all \
 	restart-backend restart-frontend restart-worker restart-all \
 	status build lint db-migrate db-revision install docker-up docker-down
@@ -14,7 +14,7 @@ dev:
 
 dev-all:
 	@echo "Starting backend, frontend, and workers..."
-	@make -j6 dev-api dev-web dev-worker-ai-1 dev-worker-ai-2 dev-worker-ai-3 dev-worker-maintenance
+	@make -j7 dev-api dev-web dev-worker-ai-1 dev-worker-ai-2 dev-worker-ai-3 dev-worker-maintenance dev-worker-email
 
 dev-api:
 	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -24,19 +24,22 @@ dev-web:
 
 # Convenience alias — spins up all workers (3x AI + 1x maintenance)
 dev-worker:
-	@$(MAKE) -j4 dev-worker-ai-1 dev-worker-ai-2 dev-worker-ai-3 dev-worker-maintenance
+	@$(MAKE) -j5 dev-worker-ai-1 dev-worker-ai-2 dev-worker-ai-3 dev-worker-maintenance dev-worker-email
 
 dev-worker-ai-1:
-	cd backend && ../.venv/bin/python -m arq app.workers.menu_ingestion.AIWorkerSettings
+	cd backend && ./.venv/bin/python -m arq app.workers.menu_ingestion.AIWorkerSettings
 
 dev-worker-ai-2:
-	cd backend && ../.venv/bin/python -m arq app.workers.menu_ingestion.AIWorkerSettings
+	cd backend && ./.venv/bin/python -m arq app.workers.menu_ingestion.AIWorkerSettings
 
 dev-worker-ai-3:
-	cd backend && ../.venv/bin/python -m arq app.workers.menu_ingestion.AIWorkerSettings
+	cd backend && ./.venv/bin/python -m arq app.workers.menu_ingestion.AIWorkerSettings
 
 dev-worker-maintenance:
-	cd backend && ../.venv/bin/python -m arq app.workers.menu_ingestion.MaintenanceWorkerSettings
+	cd backend && ./.venv/bin/python -m arq app.workers.menu_ingestion.MaintenanceWorkerSettings
+
+dev-worker-email:
+	cd backend && ./.venv/bin/python -m arq app.workers.menu_ingestion.EmailWorkerSettings
 
 # ---------------------------------------------------------------------------
 # Process control helpers
@@ -61,10 +64,11 @@ kill-frontend:
 	fi
 
 kill-worker:
-	@if pgrep -f "arq app.workers.menu_ingestion.(AIWorkerSettings|MaintenanceWorkerSettings)" >/dev/null 2>&1; then \
+	@if pgrep -f "arq app.workers.menu_ingestion.(AIWorkerSettings|MaintenanceWorkerSettings|EmailWorkerSettings)" >/dev/null 2>&1; then \
 		echo "Killing ARQ worker(s)..."; \
 		pkill -f "arq app.workers.menu_ingestion.AIWorkerSettings"; \
 		pkill -f "arq app.workers.menu_ingestion.MaintenanceWorkerSettings"; \
+		pkill -f "arq app.workers.menu_ingestion.EmailWorkerSettings"; \
 	else \
 		echo "No ARQ worker processes found"; \
 	fi
@@ -82,17 +86,18 @@ restart-frontend: kill-frontend
 
 restart-worker: kill-worker
 	@echo "Restarting workers..."
-	@$(MAKE) -j4 dev-worker-ai-1 dev-worker-ai-2 dev-worker-ai-3 dev-worker-maintenance
+	@$(MAKE) -j5 dev-worker-ai-1 dev-worker-ai-2 dev-worker-ai-3 dev-worker-maintenance dev-worker-email
 
 restart-all: kill-all
 	@echo "Restarting everything..."
-	@$(MAKE) -j6 dev-api dev-web dev-worker-ai-1 dev-worker-ai-2 dev-worker-ai-3 dev-worker-maintenance
+	@$(MAKE) -j7 dev-api dev-web dev-worker-ai-1 dev-worker-ai-2 dev-worker-ai-3 dev-worker-maintenance dev-worker-email
 
 status:
 	@echo "==> Backend (:8000):" && (lsof -i tcp:8000 -nP 2>/dev/null | cat || true)
 	@echo "==> Frontend (:3000):" && (lsof -i tcp:3000 -nP 2>/dev/null | cat || true)
 	@echo "==> AI workers:" && (pgrep -af "arq app.workers.menu_ingestion.AIWorkerSettings" || echo "  none running")
 	@echo "==> Maintenance worker:" && (pgrep -af "arq app.workers.menu_ingestion.MaintenanceWorkerSettings" || echo "  none running")
+	@echo "==> Email worker:" && (pgrep -af "arq app.workers.menu_ingestion.EmailWorkerSettings" || echo "  none running")
 
 # ---------------------------------------------------------------------------
 # Build / Lint

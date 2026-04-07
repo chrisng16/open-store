@@ -1,0 +1,8 @@
+Hello {{ customer_name }},
+
+Your order {{ order_display_id }} at {{ store_name }} is now {{ status }}.
+
+Total: {{ total_amount_display }}
+{% if order_reference %}Reference: {{ order_reference }}
+{% endif %}
+Thanks for ordering with Open Store.

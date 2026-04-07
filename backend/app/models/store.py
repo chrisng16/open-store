@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import String, Boolean, Text, ForeignKey, UniqueConstraint, Enum, Integer, CheckConstraint
+from sqlalchemy import DateTime, String, Boolean, Text, ForeignKey, UniqueConstraint, Enum, Integer, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.base import NO_VALUE
 from sqlalchemy import inspect
@@ -210,8 +210,8 @@ class StoreInvite(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     status: Mapped[InviteStatus] = mapped_column(
         Enum(InviteStatus), nullable=False, default=InviteStatus.pending, index=True
     )
-    expires_at: Mapped[datetime] = mapped_column(nullable=False)
-    accepted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     store: Mapped["Store"] = relationship(back_populates="invites")
 
