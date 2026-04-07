@@ -2,15 +2,17 @@
 
 import { StoreEditForm, StoreEditFormHandle } from "@/components/dashboard/store/store-edit-form";
 import { StorefrontCustomizationForm, StorefrontCustomizationFormHandle } from "@/components/dashboard/store/storefront-customization-form";
+import type { FormDirtyState } from "@/components/dashboard/store/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { Store } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { useStoreOnboardingStatusQuery } from "@/queries/stores";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Loader2, Save, Undo2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { use, useEffect, useRef, useState, Suspense } from "react";
+import { Suspense, use, useEffect, useRef, useState } from "react";
 import StoreSubNav from "../_components/store-sub-nav";
 
 interface StoreOverviewPageProps {
@@ -30,11 +32,14 @@ function StoreOverviewContent({ params }: StoreOverviewPageProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const currentTab = searchParams.get("tab") === "appearance" ? "appearance" : "general";
-    
+
     const generalFormRef = useRef<StoreEditFormHandle>(null);
     const appearanceFormRef = useRef<StorefrontCustomizationFormHandle>(null);
-    const [formState, setFormState] = useState({ isDirty: false, isSubmitting: false });
-    
+    const [formState, setFormState] = useState<FormDirtyState>({
+        isDirty: false,
+        isSubmitting: false,
+    });
+
     const { data: onboardingStatus, isPending: onboardingPending } =
         useStoreOnboardingStatusQuery(storeId);
 
@@ -92,7 +97,7 @@ function StoreOverviewContent({ params }: StoreOverviewPageProps) {
                 <StoreSubNav pending={isPending} store={store} />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-                <div className="mx-auto w-full max-w-4xl pb-4">
+                <div className={cn("mx-auto w-full pb-4", currentTab === "appearance" ? "max-w-6xl" : "max-w-4xl")}>
                     <h2 className="text-xl font-semibold tracking-tight">
                         {currentTab === "appearance" ? "Storefront Customization" : "General Settings"}
                     </h2>
@@ -100,25 +105,27 @@ function StoreOverviewContent({ params }: StoreOverviewPageProps) {
                         {currentTab === "appearance" ? "Design the look and feel of your public store." : "Manage your store's core details and business hours."}
                     </p>
                 </div>
-                {currentTab === "appearance" ? (
-                    <StorefrontCustomizationForm
-                        ref={appearanceFormRef}
-                        store={store}
-                        onSuccess={() => refetch()}
-                        onStateChange={setFormState}
-                    />
-                ) : (
-                    <StoreEditForm
-                        ref={generalFormRef}
-                        store={store}
-                        mode="edit"
-                        onSuccess={() => refetch()}
-                        onStateChange={setFormState}
-                    />
-                )}
+                <div className={cn("mx-auto w-full", currentTab === "appearance" ? "max-w-6xl" : "max-w-4xl")}>
+                    {currentTab === "appearance" ? (
+                        <StorefrontCustomizationForm
+                            ref={appearanceFormRef}
+                            store={store}
+                            onSuccess={() => refetch()}
+                            onStateChange={setFormState}
+                        />
+                    ) : (
+                        <StoreEditForm
+                            ref={generalFormRef}
+                            store={store}
+                            mode="edit"
+                            onSuccess={() => refetch()}
+                            onStateChange={setFormState}
+                        />
+                    )}
+                </div>
             </div>
             <div className="shrink-0 rounded-b-md border-t bg-background-elevated/70 backdrop-blur">
-                <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 p-4 py-3">
+                <div className={cn("mx-auto flex w-full items-center justify-between gap-4 p-4 py-3", currentTab === "appearance" ? "max-w-6xl" : "max-w-4xl")}>
                     <div className="flex flex-col">
                         {formState.isDirty ? (
                             <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">

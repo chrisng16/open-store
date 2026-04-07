@@ -18,28 +18,30 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { denormalizeRequest } from "@/lib/normalize-response";
-import { Store } from "@/queries/stores";
+import type { Store } from "@/lib/types";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { forwardRef, useEffect, useImperativeHandle } from "react";
 import { toast } from "sonner";
 
 import { BusinessHoursSelector } from "@/components/dashboard/store/business-hours-selector";
-import {
-    defaultWeekHours,
-    type WeekHours,
-} from "@/components/dashboard/store/time-utils";
 import { TimezoneSelector } from "@/components/dashboard/store/timezone-selector";
+import {
+    type FormDirtyState,
+    normalizeStoreBusinessHours,
+    type StoreEditFormValues,
+    type StoreFormMode,
+} from "@/components/dashboard/store/types";
 
 // ─── Props & handle ───────────────────────────────────────────────────────────
 
 interface StoreEditFormProps {
     // If `store` is omitted the form runs in "create" mode.
-    store?: Store & { businessHours?: WeekHours };
+    store?: Store;
     // Optional explicit mode override; if omitted mode is inferred from `store`.
-    mode?: "create" | "edit";
+    mode?: StoreFormMode;
     onSuccess?: (updated: Store) => void;
-    onStateChange?: (state: { isDirty: boolean; isSubmitting: boolean }) => void;
+    onStateChange?: (state: FormDirtyState) => void;
 }
 
 export interface StoreEditFormHandle {
@@ -53,8 +55,8 @@ function FormStateSync({
     state,
     onStateChange,
 }: {
-    state: { isDirty: boolean; isSubmitting: boolean };
-    onStateChange?: (state: { isDirty: boolean; isSubmitting: boolean }) => void;
+    state: FormDirtyState;
+    onStateChange?: (state: FormDirtyState) => void;
 }) {
     useEffect(() => {
         onStateChange?.(state);
@@ -65,20 +67,18 @@ function FormStateSync({
 // ─── Form ─────────────────────────────────────────────────────────────────────
 
 export const StoreEditForm = forwardRef<StoreEditFormHandle, StoreEditFormProps>(
-    function StoreEditForm({ store, onSuccess, onStateChange }, ref) {
-        const isCreate = !store;
+    function StoreEditForm({ store, mode, onSuccess, onStateChange }, ref) {
+        const resolvedMode: StoreFormMode = mode ?? (store ? "edit" : "create");
+        const isCreate = resolvedMode === "create";
         const queryClient = useQueryClient();
 
         const saveStoreMutation = useMutation({
-            mutationFn: async (value: {
-                name: string;
-                description: string;
-                address: string;
-                phone: string;
-                slug: string;
-                timezone: string;
-                businessHours: WeekHours;
-            }) => {
+            mutationFn: async (value: StoreEditFormValues) => {
+                const storeId = store?.id;
+                if (!isCreate && !storeId) {
+                    throw new Error("Store is required in edit mode");
+                }
+
                 const base = {
                     ...value,
                     description: value.description || null,
@@ -91,7 +91,7 @@ export const StoreEditForm = forwardRef<StoreEditFormHandle, StoreEditFormProps>
                 }
 
                 const payload = denormalizeRequest(base);
-                const endpoint = isCreate ? "/stores" : `/stores/${store!.id}`;
+                const endpoint = isCreate ? "/stores" : `/stores/${storeId}`;
                 const method = isCreate ? "POST" : "PATCH";
 
                 return fetchWithAccessToken<Store>(endpoint, {
@@ -129,7 +129,7 @@ export const StoreEditForm = forwardRef<StoreEditFormHandle, StoreEditFormProps>
                 // Timezone is now an IANA string, not a free-text field.
                 timezone: store?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "PST",
                 // Business hours live here; the selector writes to this key directly.
-                businessHours: store?.businessHours ?? defaultWeekHours,
+                businessHours: normalizeStoreBusinessHours(store?.businessHours),
             },
 
             onSubmit: async ({ value }) => {
@@ -365,7 +365,7 @@ export const StoreEditForm = forwardRef<StoreEditFormHandle, StoreEditFormProps>
                                 <div className="space-y-2">
                                     <Label htmlFor={field.name}>Business Hours</Label>
                                     <BusinessHoursSelector
-                                        hours={field.state.value as WeekHours}
+                                        hours={field.state.value}
                                         onChangeAction={(next) => {
                                             field.handleChange(next);
                                             field.handleBlur(); // mark touched so dirty state fires

@@ -334,7 +334,6 @@ export function ProductDialog({
         data: product,
         error,
         isPending,
-        isFetching,
     } = useQuery<Product>({
         queryKey: productQueryKey,
         queryFn: () => api.products.get(storeId, productId),

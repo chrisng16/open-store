@@ -8,7 +8,7 @@ import { Product, ProductWithCategoryListItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useCartSheetState, useMenuSearchState, useStorefrontProductDialogState } from "@/stores/ui-store";
 import { ChevronLeft, ChevronRight, Plus, SearchX } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProductDialog } from "./product-dialog";
 
@@ -99,20 +99,25 @@ function TabBar({
                 className="no-scrollbar flex flex-1 items-end gap-1 overflow-x-auto  overflow-y-hidden pointer-events-none px-4"
             >
                 {sections.map((section) => (
-                    <button
-                        key={section.id}
-                        ref={(node) => { tabButtonRefs.current[section.id] = node; }}
-                        type="button"
-                        onClick={() => navigateTo(section.id)}
-                        className={cn(
-                            "shrink-0 border-b-4 rounded px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors pointer-events-auto",
-                            activeSection === section.id
-                                ? "border-foreground text-foreground"
-                                : "border-transparent text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        {section.name}
-                    </button>
+                    <>
+                        {
+                            section.products.length > 0 &&
+                            <button
+                                key={section.id}
+                                ref={(node) => { tabButtonRefs.current[section.id] = node; }}
+                                type="button"
+                                onClick={() => navigateTo(section.id)}
+                                className={cn(
+                                    "shrink-0 border-b-4 rounded px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors pointer-events-auto",
+                                    activeSection === section.id
+                                        ? "border-foreground text-foreground"
+                                        : "border-transparent text-muted-foreground hover:text-foreground",
+                                )}
+                            >
+                                {section.name}
+                            </button>
+                        }
+                    </>
                 ))}
             </div>
 
@@ -318,27 +323,31 @@ export function MenuBrowser({
             <div className="space-y-10 pt-10 min-h-[50vh]">
                 {filteredSections.length > 0 ? (
                     filteredSections.map((section) => (
-                        <section
-                            key={section.id}
-                            ref={(node) => { sectionRefs.current[section.id] = node; }}
-                        >
-                            <header className="mb-4">
-                                <h3 className="text-xl font-bold tracking-tight md:text-2xl">{section.name}</h3>
-                                {section.description && (
-                                    <p className="mt-0.5 text-sm text-muted-foreground">{section.description}</p>
-                                )}
-                            </header>
+                        <React.Fragment key={section.id}>
+                            {
+                                section.products.length > 0 &&
+                                <section
+                                    ref={(node) => { sectionRefs.current[section.id] = node; }}
+                                >
+                                    <header className="mb-4">
+                                        <h3 className="text-xl font-bold tracking-tight md:text-2xl">{section.name}</h3>
+                                        {section.description && (
+                                            <p className="mt-0.5 text-sm text-muted-foreground">{section.description}</p>
+                                        )}
+                                    </header>
 
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                {section.products.map((product) => (
-                                    <ProductCard
-                                        key={product.id}
-                                        product={product}
-                                        onSelect={() => storefrontProductDialog.open(product.id)}
-                                    />
-                                ))}
-                            </div>
-                        </section>
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                        {section.products.map((product) => (
+                                            <ProductCard
+                                                key={product.id}
+                                                product={product}
+                                                onSelect={() => storefrontProductDialog.open(product.id)}
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
+                            }
+                        </React.Fragment>
                     ))
                 ) : (
                     <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in zoom-in duration-300">

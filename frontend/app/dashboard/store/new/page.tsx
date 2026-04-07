@@ -1,6 +1,7 @@
 "use client";
 
 import { StoreEditForm, StoreEditFormHandle } from "@/components/dashboard/store/store-edit-form";
+import type { FormDirtyState } from "@/components/dashboard/store/types";
 import { Button } from "@/components/ui/button";
 import { Store } from "@/queries/stores";
 import { useRouter } from "next/navigation";
@@ -10,7 +11,10 @@ export default function NewStorePage() {
     const router = useRouter();
 
     const formRef = useRef<StoreEditFormHandle>(null);
-    const [formState, setFormState] = useState({ isDirty: false, isSubmitting: false });
+    const [formState, setFormState] = useState<FormDirtyState>({
+        isDirty: false,
+        isSubmitting: false,
+    });
 
     return (
         <div className="relative">

@@ -10,6 +10,9 @@ import {
 import {
     CategoryDeleteDialog,
 } from "@/components/dashboard/common/category-delete-dialog";
+import {
+    CategoryStatusChangeDialog,
+} from "@/components/dashboard/common/category-status-change-dialog";
 import { DataTable } from "@/components/dashboard/common/data-table";
 import { Button } from "@/components/ui/button";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
@@ -143,6 +146,8 @@ export default function CategoriesPage({
     const [categoryToDelete, setCategoryToDelete] = useState<CategoryRow | null>(null);
     const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
     const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+    const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
+    const [categoryStatusChange, setCategoryStatusChange] = useState<{ category: CategoryRow; isActive: boolean } | null>(null);
     const { openCategoryCreate, openCategoryEdit } = useCategoryDialogActions();
     const { filters, updateFilters, toApiParams, toQueryShape } = useListFilters(categoryFiltersConfig);
 
@@ -197,6 +202,25 @@ export default function CategoriesPage({
         },
     });
 
+    const updateCategoryStatusMutation = useMutation({
+        mutationFn: async ({ categoryId, isActive }: { categoryId: string; isActive: boolean }) => {
+            await fetchWithAccessToken<void>(`/stores/${storeId}/categories/${categoryId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: isActive }),
+            });
+        },
+        onSuccess: () => {
+            toast.success("Category status updated");
+            setIsStatusChangeOpen(false);
+            setCategoryStatusChange(null);
+            void refetch();
+        },
+        onError: (error) => {
+            toast.error(error instanceof Error ? error.message : "Failed to update category status");
+        },
+    });
+
     function openCreateDialog() {
         openCategoryCreate();
     }
@@ -221,9 +245,21 @@ export default function CategoriesPage({
             getCategoriesTableColumns({
                 onEdit: openEditDialog,
                 onDelete: openDeleteDialog,
+                onStatusToggle: async (category, isActive) => {
+                    setCategoryStatusChange({ category, isActive });
+                    setIsStatusChangeOpen(true);
+                },
             }),
         [openCategoryEdit]
     );
+
+    async function handleStatusChange() {
+        if (!categoryStatusChange) return;
+        await updateCategoryStatusMutation.mutateAsync({
+            categoryId: categoryStatusChange.category.id,
+            isActive: categoryStatusChange.isActive,
+        });
+    }
 
     async function handleDelete() {
         if (!categoryToDelete) return;
@@ -300,6 +336,15 @@ export default function CategoriesPage({
                 categoryName={categoryToDelete?.name}
                 isDeleting={deleteMutation.isPending}
                 onConfirm={handleDelete}
+            />
+
+            <CategoryStatusChangeDialog
+                open={isStatusChangeOpen}
+                onOpenChange={setIsStatusChangeOpen}
+                categoryName={categoryStatusChange?.category.name}
+                isActive={categoryStatusChange?.isActive ?? false}
+                isUpdating={updateCategoryStatusMutation.isPending}
+                onConfirm={handleStatusChange}
             />
 
             <BulkDeleteDialog

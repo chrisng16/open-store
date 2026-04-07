@@ -44,6 +44,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
 type DataTableProps<TData, TValue> = {
     columns: ColumnDef<TData, TValue>[];
@@ -96,6 +97,7 @@ function formatColumnLabel(columnId: string) {
         .trim();
 }
 
+
 export function DataTable<TData, TValue>({
     columns,
     data,
@@ -107,7 +109,7 @@ export function DataTable<TData, TValue>({
     emptyAction,
     searchColumnId,
     searchPlaceholder = "Search...",
-    defaultPageSize = 20,
+    defaultPageSize = DEFAULT_PAGE_SIZE,
     enableRowSelection = false,
     getRowId,
     enableDefaultActionBar = true,

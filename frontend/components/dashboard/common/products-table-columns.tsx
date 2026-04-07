@@ -22,6 +22,7 @@ import { useState } from "react";
 export type ProductCategoryOption = {
     id: string;
     name: string;
+    isActive: boolean;
 };
 
 export type ProductRow = {
@@ -57,14 +58,17 @@ type ProductsColumnsParams = {
 
 function StatusToggle({
     isActive,
+    categoryInactive = false,
     onToggle,
     disabled = false
 }: {
     isActive: boolean;
+    categoryInactive?: boolean;
     onToggle: (val: boolean) => Promise<void>;
     disabled?: boolean;
 }) {
     const [isUpdating, setIsUpdating] = useState(false);
+    const effectivelyHidden = isActive && categoryInactive;
 
     const handleToggle = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -87,29 +91,34 @@ function StatusToggle({
                     className={cn(
                         "relative inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all duration-300 select-none cursor-pointer",
                         "border shadow-xs active:scale-95 disabled:opacity-70 disabled:scale-100",
-                        isActive
-                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
-                            : "bg-muted/40 border-muted-foreground/20 text-muted-foreground hover:bg-muted/60"
+                        effectivelyHidden
+                            ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
+                            : isActive
+                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                                : "bg-muted/40 border-muted-foreground/20 text-muted-foreground hover:bg-muted/60"
                     )}
                 >
                     <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center">
-                        {isActive && !isUpdating && (
-                            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        )}
                         {!isUpdating ? (
                             <span className={cn(
                                 "relative inline-flex h-1.5 w-1.5 rounded-full",
-                                isActive ? "bg-emerald-500" : "bg-muted-foreground/50",
+                                effectivelyHidden ? "bg-amber-500" : isActive ? "bg-emerald-500" : "bg-muted-foreground/50",
                             )} />
                         ) : (
                             <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         )}
                     </span>
-                    <span className="leading-none">{isActive ? "Active" : "Hidden"}</span>
+                    <span className="leading-none">
+                        {effectivelyHidden ? "Hidden" : isActive ? "Active" : "Hidden"}
+                    </span>
                 </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[11px] font-medium px-2 py-1">
-                {isActive ? "Click to hide from customers" : "Click to make visible to customers"}
+            <TooltipContent side="top" className="text-[11px] font-medium px-2 py-1 max-w-44 text-center">
+                {effectivelyHidden
+                    ? "Category is inactive — enable the category to make this visible"
+                    : isActive
+                        ? "Click to hide from customers"
+                        : "Click to make visible to customers"}
             </TooltipContent>
         </Tooltip>
     );
@@ -217,14 +226,19 @@ export function getProductsTableColumns({
                     <DataTableColumnHeader column={column} title="Status" className="-ml-3" />
                 </div>
             ),
-            cell: ({ row }) => (
-                <div className="text-left">
-                    <StatusToggle
-                        isActive={row.original.isActive}
-                        onToggle={(val) => onStatusToggle(row.original, val)}
-                    />
-                </div>
-            ),
+            cell: ({ row }) => {
+                const product = row.original;
+                const categoryInactive = !!product.category && !product.category.isActive;
+                return (
+                    <div className="text-left">
+                        <StatusToggle
+                            isActive={product.isActive}
+                            categoryInactive={categoryInactive}
+                            onToggle={(val) => onStatusToggle(product, val)}
+                        />
+                    </div>
+                );
+            },
         },
         {
             id: "actions",
