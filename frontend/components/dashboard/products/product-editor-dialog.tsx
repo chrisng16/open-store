@@ -22,6 +22,7 @@ type ProductEditorDialogProps = {
     isUploadingImage: boolean;
     onSubmit: (formData: ProductFormData) => Promise<void>;
     onUploadImage: (file: File) => Promise<string>;
+    disablePriceEditing?: boolean;
 };
 
 type ProductDetailResponse = {
@@ -57,6 +58,7 @@ export function ProductEditorDialog({
     isUploadingImage,
     onSubmit,
     onUploadImage,
+    disablePriceEditing = false,
 }: ProductEditorDialogProps) {
     const queryClient = useQueryClient();
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
@@ -157,6 +159,7 @@ export function ProductEditorDialog({
                             formData={formData}
                             onFormDataChange={handleFormDataChange}
                             categories={categories}
+                            disablePriceEditing={disablePriceEditing && !!formData.id}
                             optionsOpen={isOptionsOpen}
                             onToggleOptions={() => setIsOptionsOpen(prev => !prev)}
                             isUploadingImage={isUploadingImage}

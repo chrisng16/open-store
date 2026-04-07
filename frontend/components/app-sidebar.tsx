@@ -23,6 +23,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useStoreCapabilities } from "@/hooks/use-store-capabilities"
 import { usePathname } from "next/navigation"
 import { Button } from "./ui/button"
 
@@ -93,12 +94,63 @@ export function AppSidebar({
   const { toggleSidebar } = useSidebar()
 
   const pathname = usePathname()
+  const pathParts = React.useMemo(() => pathname?.split("/").filter(Boolean) ?? [], [pathname])
+  const storeId = pathParts[0] === "dashboard" ? pathParts[1] : undefined
+  const capabilities = useStoreCapabilities(storeId)
+
   const activeRoute = React.useMemo(() => {
     if (!pathname) return null
-    const parts = pathname.split("/").filter(Boolean)
-    if (parts.length < 3) return 'general'
-    return parts[2]
-  }, [pathname])
+    if (pathParts.length < 3) return 'general'
+    return pathParts[2]
+  }, [pathParts, pathname])
+
+  const navStoreSetup = React.useMemo(() => {
+    const items = [...data.navStoreSetup]
+    if (!storeId || capabilities.isLoading) {
+      return items
+    }
+
+    return items.filter((item) => {
+      if (item.title === "Payments") {
+        return capabilities.canAccessPayments
+      }
+      if (item.title === "General") {
+        return capabilities.canAccessDashboard
+      }
+      return true
+    })
+  }, [capabilities.canAccessDashboard, capabilities.canAccessPayments, capabilities.isLoading, storeId])
+
+  const navCatalog = React.useMemo(() => {
+    const items = [...data.navCatalog]
+    if (!storeId || capabilities.isLoading) {
+      return items
+    }
+
+    return items.filter((item) => {
+      if (item.title === "AI Import") {
+        return capabilities.canManageProducts
+      }
+      return capabilities.canManageProducts || capabilities.canManageCategories
+    })
+  }, [capabilities.canManageCategories, capabilities.canManageProducts, capabilities.isLoading, storeId])
+
+  const navOperations = React.useMemo(() => {
+    const items = [...data.navOperations]
+    if (!storeId || capabilities.isLoading) {
+      return items
+    }
+
+    return items.filter((item) => {
+      if (item.title === "Orders") {
+        return capabilities.canViewOrders
+      }
+      if (item.title === "Analytics") {
+        return capabilities.canViewAnalytics
+      }
+      return true
+    })
+  }, [capabilities.canViewAnalytics, capabilities.canViewOrders, capabilities.isLoading, storeId])
 
   return (
     <Sidebar
@@ -107,21 +159,27 @@ export function AppSidebar({
       {...props}
     >
       <SidebarContent className="pt-0">
-        <NavGroup
-          items={data.navStoreSetup}
-          navGroupTitle="Store Settings"
-          activeRoute={activeRoute}
-        />
-        <NavGroup
-          items={data.navCatalog}
-          navGroupTitle="Catalog"
-          activeRoute={activeRoute}
-        />
-        <NavGroup
-          items={data.navOperations}
-          navGroupTitle="Operations"
-          activeRoute={activeRoute}
-        />
+        {navStoreSetup.length > 0 ? (
+          <NavGroup
+            items={navStoreSetup}
+            navGroupTitle="Store Settings"
+            activeRoute={activeRoute}
+          />
+        ) : null}
+        {navCatalog.length > 0 ? (
+          <NavGroup
+            items={navCatalog}
+            navGroupTitle="Catalog"
+            activeRoute={activeRoute}
+          />
+        ) : null}
+        {navOperations.length > 0 ? (
+          <NavGroup
+            items={navOperations}
+            navGroupTitle="Operations"
+            activeRoute={activeRoute}
+          />
+        ) : null}
         <NavSecondary
           items={data.navSecondary}
           activeRoute={activeRoute}

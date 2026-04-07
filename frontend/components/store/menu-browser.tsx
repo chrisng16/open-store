@@ -99,11 +99,10 @@ function TabBar({
                 className="no-scrollbar flex flex-1 items-end gap-1 overflow-x-auto  overflow-y-hidden pointer-events-none px-4"
             >
                 {sections.map((section) => (
-                    <>
+                    <React.Fragment key={section.id}>
                         {
                             section.products.length > 0 &&
                             <button
-                                key={section.id}
                                 ref={(node) => { tabButtonRefs.current[section.id] = node; }}
                                 type="button"
                                 onClick={() => navigateTo(section.id)}
@@ -117,7 +116,7 @@ function TabBar({
                                 {section.name}
                             </button>
                         }
-                    </>
+                    </React.Fragment>
                 ))}
             </div>
 

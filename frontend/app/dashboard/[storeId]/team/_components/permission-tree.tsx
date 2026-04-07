@@ -13,6 +13,13 @@ export type PermissionTreeNode = {
 
 export const ROLE_PERMISSION_TREE: PermissionTreeNode[] = [
     {
+        key: "dashboard",
+        label: "Dashboard",
+        children: [
+            { key: "dashboard.access", label: "Access dashboard" },
+        ],
+    },
+    {
         key: "team",
         label: "Team",
         children: [
@@ -30,6 +37,7 @@ export const ROLE_PERMISSION_TREE: PermissionTreeNode[] = [
         children: [
             { key: "products.read", label: "View products" },
             { key: "products.write", label: "Create and edit products" },
+            { key: "products.pricing.write", label: "Update product prices" },
             { key: "categories.write", label: "Manage categories" },
         ],
     },

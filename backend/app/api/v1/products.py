@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.api.pagination import get_offset_pagination, OffsetPaginationParams, resolve_offset_pagination
 from app.api.sorting import resolve_sort_expression
 from app.database import get_db
-from app.api.deps import get_store_context, require_role, StoreContext
+from app.api.deps import get_store_context, require_permission, require_role, StoreContext
 from app.models.store import MemberRole
 from app.models.product import Category, Product, OptionList, Option
 from app.schemas.product import (
@@ -93,7 +93,7 @@ async def list_categories(
 @router.post("/categories", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 async def create_category(
     data: CategoryCreate,
-    ctx: StoreContext = Depends(require_role(MemberRole.staff)),
+    ctx: StoreContext = Depends(require_permission("categories.write")),
     db: AsyncSession = Depends(get_db),
 ):
     category = Category(store_id=ctx.store.id, **data.model_dump())
@@ -107,7 +107,7 @@ async def create_category(
 async def update_category(
     category_id: uuid.UUID,
     data: CategoryUpdate,
-    ctx: StoreContext = Depends(require_role(MemberRole.staff)),
+    ctx: StoreContext = Depends(require_permission("categories.write")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -255,7 +255,7 @@ async def get_product(
 @router.post("/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def create_product(
     data: ProductCreate,
-    ctx: StoreContext = Depends(require_role(MemberRole.staff)),
+    ctx: StoreContext = Depends(require_permission("products.write")),
     db: AsyncSession = Depends(get_db),
 ):
     product_data = data.model_dump(exclude={"option_lists"})
@@ -309,7 +309,7 @@ async def create_product(
 async def update_product(
     product_id: uuid.UUID,
     data: ProductUpdate,
-    ctx: StoreContext = Depends(require_role(MemberRole.staff)),
+    ctx: StoreContext = Depends(require_permission("products.write")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -322,6 +322,12 @@ async def update_product(
         raise HTTPException(status_code=404, detail="Product not found")
 
     update_payload = data.model_dump(exclude_unset=True, exclude={"option_lists"})
+    if "unit_amount" in update_payload and "products.pricing.write" not in ctx.permissions:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only owners can update product prices",
+        )
+
     for field, value in update_payload.items():
         setattr(product, field, value)
 

@@ -15,6 +15,7 @@ import {
 } from "@/components/dashboard/common/category-status-change-dialog";
 import { DataTable } from "@/components/dashboard/common/data-table";
 import { Button } from "@/components/ui/button";
+import { useStoreCapabilities } from "@/hooks/use-store-capabilities";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { buildListQueryKey, type ListFilterConfig, useListFilters } from "@/lib/list-filters";
 import {
@@ -149,6 +150,7 @@ export default function CategoriesPage({
     const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
     const [categoryStatusChange, setCategoryStatusChange] = useState<{ category: CategoryRow; isActive: boolean } | null>(null);
     const { openCategoryCreate, openCategoryEdit } = useCategoryDialogActions();
+    const capabilities = useStoreCapabilities(storeId);
     const { filters, updateFilters, toApiParams, toQueryShape } = useListFilters(categoryFiltersConfig);
 
     const { data, isPending, refetch } = useQuery({
@@ -166,6 +168,9 @@ export default function CategoriesPage({
 
     const deleteMutation = useMutation({
         mutationFn: async (categoryId: string) => {
+            if (!capabilities.canDeleteCategories) {
+                throw new Error(capabilities.ownerOnlyReason);
+            }
             await fetchWithAccessToken<void>(`/stores/${storeId}/categories/${categoryId}`, {
                 method: "DELETE",
             });
@@ -183,6 +188,9 @@ export default function CategoriesPage({
 
     const bulkDeleteMutation = useMutation({
         mutationFn: async (categoryIds: string[]) => {
+            if (!capabilities.canDeleteCategories) {
+                throw new Error(capabilities.ownerOnlyReason);
+            }
             await Promise.all(
                 categoryIds.map((categoryId) =>
                     fetchWithAccessToken<void>(`/stores/${storeId}/categories/${categoryId}`, {
@@ -204,6 +212,9 @@ export default function CategoriesPage({
 
     const updateCategoryStatusMutation = useMutation({
         mutationFn: async ({ categoryId, isActive }: { categoryId: string; isActive: boolean }) => {
+            if (!capabilities.canManageCategories) {
+                throw new Error("You do not have permission to update category status.");
+            }
             await fetchWithAccessToken<void>(`/stores/${storeId}/categories/${categoryId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -222,10 +233,18 @@ export default function CategoriesPage({
     });
 
     function openCreateDialog() {
+        if (!capabilities.canManageCategories) {
+            toast.error("You do not have permission to create categories.");
+            return;
+        }
         openCategoryCreate();
     }
 
     function openEditDialog(category: CategoryRow) {
+        if (!capabilities.canManageCategories) {
+            toast.error("You do not have permission to edit categories.");
+            return;
+        }
         openCategoryEdit({
             id: category.id,
             name: category.name,
@@ -236,6 +255,10 @@ export default function CategoriesPage({
     }
 
     function openDeleteDialog(category: CategoryRow) {
+        if (!capabilities.canDeleteCategories) {
+            toast.error(capabilities.ownerOnlyReason);
+            return;
+        }
         setCategoryToDelete(category);
         setIsDeleteOpen(true);
     }
@@ -246,11 +269,21 @@ export default function CategoriesPage({
                 onEdit: openEditDialog,
                 onDelete: openDeleteDialog,
                 onStatusToggle: async (category, isActive) => {
+                    if (!capabilities.canManageCategories) {
+                        toast.error("You do not have permission to update category status.");
+                        return;
+                    }
                     setCategoryStatusChange({ category, isActive });
                     setIsStatusChangeOpen(true);
                 },
+                canEdit: capabilities.canManageCategories,
+                canDelete: capabilities.canDeleteCategories,
+                canToggleStatus: capabilities.canManageCategories,
+                editDisabledReason: "You do not have permission to edit categories.",
+                deleteDisabledReason: capabilities.ownerOnlyReason,
+                statusDisabledReason: "You do not have permission to update category status.",
             }),
-        [openCategoryEdit]
+        [capabilities, openCategoryEdit]
     );
 
     async function handleStatusChange() {
@@ -280,7 +313,11 @@ export default function CategoriesPage({
                         <Button
                             variant={selectedRows.length > 0 ? "destructive" : "outline"}
                             size="sm"
-                            disabled={bulkDeleteMutation.isPending || selectedRows.length === 0}
+                            disabled={
+                                bulkDeleteMutation.isPending ||
+                                selectedRows.length === 0 ||
+                                !capabilities.canDeleteCategories
+                            }
                             onClick={() => {
                                 if (!selectedRows.length) return;
                                 setBulkDeleteIds(selectedRows.map((row) => row.id));

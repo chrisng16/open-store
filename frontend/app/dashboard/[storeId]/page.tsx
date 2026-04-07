@@ -5,6 +5,7 @@ import { StorefrontCustomizationForm, StorefrontCustomizationFormHandle } from "
 import type { FormDirtyState } from "@/components/dashboard/store/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useStoreCapabilities } from "@/hooks/use-store-capabilities";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { Store } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ export default function StoreOverviewPage(props: StoreOverviewPageProps) {
 
 function StoreOverviewContent({ params }: StoreOverviewPageProps) {
     const { storeId } = use(params)
+    const capabilities = useStoreCapabilities(storeId);
     const router = useRouter();
     const searchParams = useSearchParams();
     const currentTab = searchParams.get("tab") === "appearance" ? "appearance" : "general";
@@ -146,7 +148,7 @@ function StoreOverviewContent({ params }: StoreOverviewPageProps) {
                             size="sm"
                             className="rounded-full text-xs"
                             onClick={handleReset}
-                            disabled={!formState.isDirty || formState.isSubmitting}
+                            disabled={!formState.isDirty || formState.isSubmitting || !capabilities.canAccessPayments}
                         >
                             <Undo2 className="mr-1.5 size-3.5" />
                             Reset
@@ -156,7 +158,7 @@ function StoreOverviewContent({ params }: StoreOverviewPageProps) {
                             size="sm"
                             className="rounded-full px-6 text-xs font-semibold"
                             onClick={handleSave}
-                            disabled={!formState.isDirty || formState.isSubmitting}
+                            disabled={!formState.isDirty || formState.isSubmitting || !capabilities.canAccessPayments}
                         >
                             {formState.isSubmitting ? (
                                 <Loader2 className="mr-1.5 size-3.5 animate-spin" />

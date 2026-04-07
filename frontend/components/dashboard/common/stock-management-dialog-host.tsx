@@ -2,6 +2,7 @@
 
 import { CategoryEditorDialog } from "@/components/dashboard/common/category-editor-dialog";
 import { ProductEditorDialog, type ProductCategoryOption } from "@/components/dashboard/products/product-editor-dialog";
+import { useStoreCapabilities } from "@/hooks/use-store-capabilities";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { denormalizeRequest } from "@/lib/normalize-response";
 import type { PaginatedResponse } from "@/lib/pagination";
@@ -26,6 +27,7 @@ export function StockManagementDialogHost() {
     const params = useParams<{ storeId: string }>();
     const storeId = params?.storeId;
     const queryClient = useQueryClient();
+    const capabilities = useStoreCapabilities(storeId);
 
     const {
         isCategoryDialogOpen,
@@ -56,6 +58,9 @@ export function StockManagementDialogHost() {
     const saveCategoryMutation = useMutation({
         mutationFn: async () => {
             if (!storeId) throw new Error("Missing store ID");
+            if (!capabilities.canManageCategories) {
+                throw new Error("You do not have permission to manage categories.");
+            }
             const endpoint = categoryFormData.id
                 ? `/stores/${storeId}/categories/${categoryFormData.id}`
                 : `/stores/${storeId}/categories`;
@@ -91,6 +96,9 @@ export function StockManagementDialogHost() {
     const saveProductMutation = useMutation({
         mutationFn: async (formData: typeof productFormData) => {
             if (!storeId) throw new Error("Missing store ID");
+            if (!capabilities.canManageProducts) {
+                throw new Error("You do not have permission to manage products.");
+            }
             const endpoint = formData.id
                 ? `/stores/${storeId}/products/${formData.id}`
                 : `/stores/${storeId}/products`;
@@ -98,6 +106,19 @@ export function StockManagementDialogHost() {
             const parsedPrice = Number(formData.basePrice);
             if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
                 throw new Error("Price must be a valid positive number");
+            }
+
+            if (formData.id && !capabilities.canManageProductPricing) {
+                const cachedProduct = queryClient.getQueryData<{ unitAmount?: number }>([
+                    "dialog-product-detail",
+                    storeId,
+                    formData.id,
+                ]);
+                const previousPriceCents = cachedProduct?.unitAmount;
+                const nextPriceCents = Math.round(parsedPrice * 100);
+                if (typeof previousPriceCents === "number" && previousPriceCents !== nextPriceCents) {
+                    throw new Error(capabilities.ownerOnlyReason);
+                }
             }
 
             const normalizedCategoryName = formData.categoryName.trim();
@@ -273,6 +294,7 @@ export function StockManagementDialogHost() {
                 categories={categoryOptions}
                 isSaving={saveProductMutation.isPending}
                 isUploadingImage={uploadProductImageMutation.isPending}
+                disablePriceEditing={!capabilities.canManageProductPricing}
                 onSubmit={handleProductSubmit}
                 onUploadImage={async (file) => {
                     const upload = await uploadProductImageMutation.mutateAsync(file);

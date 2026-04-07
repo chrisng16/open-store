@@ -18,6 +18,7 @@ type ProductBasicInfoSheetProps = {
     optionsOpen: boolean;
     onUploadImage: (file: File) => Promise<void>;
     isUploadingImage: boolean;
+    disablePriceEditing?: boolean;
 };
 
 export function ProductBasicInfoSheet({
@@ -28,6 +29,7 @@ export function ProductBasicInfoSheet({
     optionsOpen,
     onUploadImage,
     isUploadingImage,
+    disablePriceEditing = false,
 }: ProductBasicInfoSheetProps) {
     const optionGroupCount = formData.optionLists.length;
 
@@ -67,12 +69,16 @@ export function ProductBasicInfoSheet({
                         step="0.01"
                         min="0"
                         required
+                        disabled={disablePriceEditing}
                         value={formData.basePrice}
                         onChange={(event) =>
                             onFormDataChange({ ...formData, basePrice: event.target.value })
                         }
                         placeholder="12.99"
                     />
+                    {disablePriceEditing ? (
+                        <p className="text-xs text-muted-foreground">Only store owners can update product prices.</p>
+                    ) : null}
                 </div>
 
                 <div className="space-y-2">

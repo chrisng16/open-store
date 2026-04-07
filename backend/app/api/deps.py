@@ -128,21 +128,43 @@ ROLE_HIERARCHY = {MemberRole.staff: 20, MemberRole.admin: 60, MemberRole.owner: 
 
 BASE_ROLE_PERMISSIONS: dict[MemberRole, set[str]] = {
     MemberRole.owner: {
+        "dashboard.access",
         "team.members.read",
         "team.members.write",
         "team.roles.read",
         "team.roles.write",
         "team.invites.read",
         "team.invites.write",
+        "products.read",
+        "products.write",
+        "products.pricing.write",
+        "categories.write",
+        "orders.read",
+        "orders.write",
+        "orders.refund",
     },
     MemberRole.admin: {
+        "dashboard.access",
         "team.members.read",
         "team.members.write",
         "team.roles.read",
         "team.invites.read",
         "team.invites.write",
+        "products.read",
+        "products.write",
+        "categories.write",
+        "orders.read",
+        "orders.write",
+        "orders.refund",
     },
-    MemberRole.staff: {"team.members.read"},
+    MemberRole.staff: {
+        "team.members.read",
+        "products.read",
+        "products.write",
+        "categories.write",
+        "orders.read",
+        "orders.write",
+    },
 }
 
 

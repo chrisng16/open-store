@@ -19,12 +19,12 @@ from app.api.sorting import resolve_sort_expression
 from app.config import get_settings
 from app.database import get_db
 from app.api.deps import (
-    require_role,
+    require_permission,
     get_optional_user,
     CurrentUser,
     StoreContext,
 )
-from app.models.store import MemberRole, Store, StoreMember
+from app.models.store import Store, StoreMember
 from app.models.order import Order, OrderItem, OrderItemOption, OrderStatus
 from app.models.product import Product, Option, OptionList
 from app.schemas.order import (
@@ -674,7 +674,7 @@ async def create_order(
 async def get_order_by_reference(
     store_id: uuid.UUID,
     reference: str,
-    ctx: StoreContext = Depends(require_role(MemberRole.staff)),
+    ctx: StoreContext = Depends(require_permission("orders.read")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -709,7 +709,7 @@ async def get_order_by_reference(
 
 @router.get("/orders", response_model=OrdersPageResponse)
 async def list_orders(
-    ctx: StoreContext = Depends(require_role(MemberRole.staff)),
+    ctx: StoreContext = Depends(require_permission("orders.read")),
     db: AsyncSession = Depends(get_db),
     status: str | None = None,
     created_from: date | None = None,
@@ -929,7 +929,7 @@ async def update_order(
 async def update_order_status(
     order_id: uuid.UUID,
     data: OrderStatusUpdate,
-    ctx: StoreContext = Depends(require_role(MemberRole.staff)),
+    ctx: StoreContext = Depends(require_permission("orders.write")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(

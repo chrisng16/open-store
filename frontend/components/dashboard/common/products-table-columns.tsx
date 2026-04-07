@@ -54,18 +54,26 @@ type ProductsColumnsParams = {
     onEdit: (product: ProductRow) => void;
     onDelete: (product: ProductRow) => void;
     onStatusToggle: (product: ProductRow, isActive: boolean) => Promise<void>;
+    canEdit: boolean;
+    canDelete: boolean;
+    canToggleStatus: boolean;
+    editDisabledReason?: string;
+    deleteDisabledReason?: string;
+    statusDisabledReason?: string;
 };
 
 function StatusToggle({
     isActive,
     categoryInactive = false,
     onToggle,
-    disabled = false
+    disabled = false,
+    disabledReason,
 }: {
     isActive: boolean;
     categoryInactive?: boolean;
     onToggle: (val: boolean) => Promise<void>;
     disabled?: boolean;
+    disabledReason?: string;
 }) {
     const [isUpdating, setIsUpdating] = useState(false);
     const effectivelyHidden = isActive && categoryInactive;
@@ -114,11 +122,13 @@ function StatusToggle({
                 </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="text-[11px] font-medium px-2 py-1 max-w-44 text-center">
-                {effectivelyHidden
-                    ? "Category is inactive — enable the category to make this visible"
-                    : isActive
-                        ? "Click to hide from customers"
-                        : "Click to make visible to customers"}
+                {disabled && disabledReason
+                    ? disabledReason
+                    : effectivelyHidden
+                        ? "Category is inactive — enable the category to make this visible"
+                        : isActive
+                            ? "Click to hide from customers"
+                            : "Click to make visible to customers"}
             </TooltipContent>
         </Tooltip>
     );
@@ -128,6 +138,12 @@ export function getProductsTableColumns({
     onEdit,
     onDelete,
     onStatusToggle,
+    canEdit,
+    canDelete,
+    canToggleStatus,
+    editDisabledReason,
+    deleteDisabledReason,
+    statusDisabledReason,
 }: ProductsColumnsParams): ColumnDef<ProductRow>[] {
     return [
         {
@@ -234,6 +250,8 @@ export function getProductsTableColumns({
                         <StatusToggle
                             isActive={product.isActive}
                             categoryInactive={categoryInactive}
+                            disabled={!canToggleStatus}
+                            disabledReason={statusDisabledReason}
                             onToggle={(val) => onStatusToggle(product, val)}
                         />
                     </div>
@@ -258,35 +276,67 @@ export function getProductsTableColumns({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="min-w-30">
-                                <DropdownMenuItem key="edit" onSelect={() => onEdit(row.original)}>
-                                    <Pencil className="h-4 w-4" /> Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    key="delete"
-                                    onSelect={() => onDelete(row.original)}
-                                    className="text-destructive focus:text-destructive"
-                                >
-                                    <Trash2 className="h-4 w-4 text-destructive" /> Delete
-                                </DropdownMenuItem>
+                                {canEdit ? (
+                                    <DropdownMenuItem key="edit" onSelect={() => onEdit(row.original)}>
+                                        <Pencil className="h-4 w-4" /> Edit
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem disabled key="edit-disabled">
+                                        <Pencil className="h-4 w-4" /> Edit
+                                    </DropdownMenuItem>
+                                )}
+                                {canDelete ? (
+                                    <DropdownMenuItem
+                                        key="delete"
+                                        onSelect={() => onDelete(row.original)}
+                                        className="text-destructive focus:text-destructive"
+                                    >
+                                        <Trash2 className="h-4 w-4 text-destructive" /> Delete
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem disabled key="delete-disabled">
+                                        <Trash2 className="h-4 w-4" /> Delete
+                                    </DropdownMenuItem>
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
                     <div className="hidden lg:flex items-center gap-1">
-                        <Button
-                            variant={"ghost"}
-                            size={"icon-sm"}
-                            onClick={() => onEdit(row.original)}
-                        >
-                            <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant={"ghost"}
-                            size={"icon-sm"}
-                            onClick={() => onDelete(row.original)}
-                            className="text-destructive focus:text-destructive"
-                        >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <Tooltip delayDuration={300}>
+                            <TooltipTrigger asChild>
+                                <span>
+                                    <Button
+                                        variant={"ghost"}
+                                        size={"icon-sm"}
+                                        onClick={() => onEdit(row.original)}
+                                        disabled={!canEdit}
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                </span>
+                            </TooltipTrigger>
+                            {!canEdit && editDisabledReason ? (
+                                <TooltipContent>{editDisabledReason}</TooltipContent>
+                            ) : null}
+                        </Tooltip>
+                        <Tooltip delayDuration={300}>
+                            <TooltipTrigger asChild>
+                                <span>
+                                    <Button
+                                        variant={"ghost"}
+                                        size={"icon-sm"}
+                                        onClick={() => onDelete(row.original)}
+                                        disabled={!canDelete}
+                                        className="text-destructive focus:text-destructive"
+                                    >
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </span>
+                            </TooltipTrigger>
+                            {!canDelete && deleteDisabledReason ? (
+                                <TooltipContent>{deleteDisabledReason}</TooltipContent>
+                            ) : null}
+                        </Tooltip>
                     </div>
                 </div>
             ),

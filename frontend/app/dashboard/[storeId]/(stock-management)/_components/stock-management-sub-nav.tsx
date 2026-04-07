@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useStoreCapabilities } from "@/hooks/use-store-capabilities";
 import { useCategoryDialogActions, useProductDialogActions } from "@/stores/ui-store";
 import { Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -30,8 +32,10 @@ export default function StockManagementSubNav() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const directory = pathname.split("/")[3];
+    const storeId = pathname.split("/")[2];
     const { openCategoryCreate } = useCategoryDialogActions();
     const { openProductCreate } = useProductDialogActions();
+    const capabilities = useStoreCapabilities(storeId);
 
     const statusFromUrl = resolveStatusFilter(searchParams.get("status"));
     const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(statusFromUrl);
@@ -114,10 +118,30 @@ export default function StockManagementSubNav() {
                             </Button>
                         )
                     }
-                    <Button size={"sm"} onClick={directory === 'categories' ? openCategoryCreate : openProductCreate}>
-                        <Plus />
-                        {directory === 'categories' ? 'Category' : 'Product'}
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span>
+                                <Button
+                                    size={"sm"}
+                                    disabled={
+                                        directory === "categories"
+                                            ? !capabilities.canManageCategories
+                                            : !capabilities.canManageProducts
+                                    }
+                                    onClick={directory === "categories" ? openCategoryCreate : openProductCreate}
+                                >
+                                    <Plus />
+                                    {directory === "categories" ? "Category" : "Product"}
+                                </Button>
+                            </span>
+                        </TooltipTrigger>
+                        {(directory === "categories" && !capabilities.canManageCategories) ||
+                            (directory === "products" && !capabilities.canManageProducts) ? (
+                            <TooltipContent>
+                                You do not have permission to create {directory === "categories" ? "categories" : "products"}.
+                            </TooltipContent>
+                        ) : null}
+                    </Tooltip>
                 </div>
             </div>
         </div>

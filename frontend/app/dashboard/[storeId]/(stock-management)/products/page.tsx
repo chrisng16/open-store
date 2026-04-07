@@ -8,6 +8,7 @@ import {
     type ProductRow,
 } from "@/components/dashboard/common/products-table-columns";
 import { Button } from "@/components/ui/button";
+import { useStoreCapabilities } from "@/hooks/use-store-capabilities";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { buildListQueryKey, useListFilters, type ListFilterConfig } from "@/lib/list-filters";
 import {
@@ -143,6 +144,7 @@ export default function MenuEditorPage({
     const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
     const queryClient = useQueryClient();
     const { openProductEdit } = useProductDialogActions();
+    const capabilities = useStoreCapabilities(storeId);
     const { filters, updateFilters, toApiParams, toQueryShape } = useListFilters(productFiltersConfig);
 
     const { data, isPending, refetch } = useQuery({
@@ -163,6 +165,9 @@ export default function MenuEditorPage({
 
     const updateProductStatusMutation = useMutation({
         mutationFn: async ({ productId, isActive }: { productId: string; isActive: boolean }) => {
+            if (!capabilities.canManageProducts) {
+                throw new Error("You do not have permission to update product status.");
+            }
             await fetchWithAccessToken<void>(`/stores/${storeId}/products/${productId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -180,6 +185,9 @@ export default function MenuEditorPage({
 
     const deleteProductMutation = useMutation({
         mutationFn: async (productId: string) => {
+            if (!capabilities.canDeleteProducts) {
+                throw new Error(capabilities.ownerOnlyReason);
+            }
             await fetchWithAccessToken<void>(`/stores/${storeId}/products/${productId}`, {
                 method: "DELETE",
             });
@@ -196,6 +204,9 @@ export default function MenuEditorPage({
 
     const bulkDeleteProductsMutation = useMutation({
         mutationFn: async (productIds: string[]) => {
+            if (!capabilities.canDeleteProducts) {
+                throw new Error(capabilities.ownerOnlyReason);
+            }
             await Promise.all(
                 productIds.map((productId) =>
                     fetchWithAccessToken<void>(`/stores/${storeId}/products/${productId}`, {
@@ -243,6 +254,10 @@ export default function MenuEditorPage({
         () =>
             getProductsTableColumns({
                 onEdit: (product) => {
+                    if (!capabilities.canManageProducts) {
+                        toast.error("You do not have permission to edit products.");
+                        return;
+                    }
                     const initialCategoryName = product.category?.name ?? "";
 
                     queryClient.setQueryData(
@@ -253,6 +268,10 @@ export default function MenuEditorPage({
                     openProductEdit(toProductFormData(product, initialCategoryName));
                 },
                 onDelete: (product) => {
+                    if (!capabilities.canDeleteProducts) {
+                        toast.error(capabilities.ownerOnlyReason);
+                        return;
+                    }
                     setProductToDelete(product);
                 },
                 onStatusToggle: async (product, isActive) => {
@@ -261,8 +280,14 @@ export default function MenuEditorPage({
                         isActive,
                     });
                 },
+                canEdit: capabilities.canManageProducts,
+                canDelete: capabilities.canDeleteProducts,
+                canToggleStatus: capabilities.canManageProducts,
+                editDisabledReason: "You do not have permission to edit products.",
+                deleteDisabledReason: capabilities.ownerOnlyReason,
+                statusDisabledReason: "You do not have permission to update product status.",
             }),
-        [openProductEdit, queryClient, storeId, updateProductStatusMutation]
+        [capabilities, openProductEdit, queryClient, storeId, updateProductStatusMutation]
     );
 
     async function handleDeleteProduct() {
@@ -280,6 +305,10 @@ export default function MenuEditorPage({
                     enableRowSelection
                     getRowId={(row) => row.id}
                     onRowClick={(product) => {
+                        if (!capabilities.canManageProducts) {
+                            toast.error("You do not have permission to edit products.");
+                            return;
+                        }
                         const initialCategoryName = product.category?.name ?? "";
 
                         queryClient.setQueryData(
@@ -293,7 +322,11 @@ export default function MenuEditorPage({
                         <Button
                             variant={selectedRows.length > 0 ? "destructive" : "outline"}
                             size="sm"
-                            disabled={bulkDeleteProductsMutation.isPending || selectedRows.length === 0}
+                            disabled={
+                                bulkDeleteProductsMutation.isPending ||
+                                selectedRows.length === 0 ||
+                                !capabilities.canDeleteProducts
+                            }
                             onClick={() => {
                                 if (!selectedRows.length) return;
                                 setBulkDeleteIds(selectedRows.map((row) => row.id));

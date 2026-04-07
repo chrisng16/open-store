@@ -1,16 +1,17 @@
 "use client";
 
+import { NotAllowedState } from "@/components/dashboard/common/not-allowed-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useStoreCapabilities } from "@/hooks/use-store-capabilities";
 import { fetchWithAccessToken } from "@/lib/auth-fetch";
 import { createClient } from "@/lib/supabase/client";
 import { useTeamMembersQuery } from "@/queries/team";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertCircle, Banknote, CheckCircle2, CreditCard, ExternalLink, Globe, Landmark, Loader2, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Wallet } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { use, useEffect, useMemo, useState } from "react";
 
@@ -50,6 +51,7 @@ export default function PaymentsPage({
     params: Promise<{ storeId: string }>;
 }) {
     const { storeId } = use(params);
+    const capabilities = useStoreCapabilities(storeId);
     const searchParams = useSearchParams();
     const pathname = usePathname();
     const router = useRouter();
@@ -80,7 +82,7 @@ export default function PaymentsPage({
         return membersQuery.data.find((member) => member.userId === currentUserId) ?? null;
     }, [currentUserId, membersQuery.data]);
 
-    const isOwner = myMember?.role === "owner";
+    const canAccessPayments = capabilities.canAccessPayments;
 
     const {
         data: store,
@@ -99,7 +101,7 @@ export default function PaymentsPage({
     } = useQuery({
         queryKey: ["stripe-status", storeId],
         queryFn: async () => fetchWithAccessToken<StripeStatus>(`/stores/${storeId}/stripe/status`),
-        enabled: !!storeId && isOwner,
+        enabled: !!storeId && canAccessPayments,
         refetchInterval: (query) => {
             const status = query.state.data;
             if (!status) {
@@ -111,7 +113,7 @@ export default function PaymentsPage({
     });
 
     useEffect(() => {
-        if (!isOwner) {
+        if (!canAccessPayments) {
             return;
         }
         if (stripeFlowState === "complete" || stripeFlowState === "refresh") {
@@ -124,7 +126,7 @@ export default function PaymentsPage({
             }, 1500);
             return () => window.clearTimeout(timer);
         }
-    }, [isOwner, stripeFlowState, refetchStripeStatus, refetchStore, router, pathname]);
+    }, [canAccessPayments, stripeFlowState, refetchStripeStatus, refetchStore, router, pathname]);
 
     const onboardMutation = useMutation({
         mutationFn: async () =>
@@ -139,7 +141,7 @@ export default function PaymentsPage({
         },
     });
 
-    const loadingAccess = membersQuery.isPending || currentUserPending;
+    const loadingAccess = membersQuery.isPending || currentUserPending || capabilities.isLoading;
     const isInitialLoading = loadingAccess || storePending;
     const hasStripeAccount = !!store && (stripeStatus?.connected || !!store.stripeAccountId);
     const isConnected = !!store && (stripeStatus?.charges_enabled || store.stripeOnboardingComplete);
@@ -171,7 +173,7 @@ export default function PaymentsPage({
                                         void refetchStripeStatus();
                                         void refetchStore();
                                     }}
-                                    disabled={stripeStatusFetching}
+                                    disabled={stripeStatusFetching || !canAccessPayments}
                                 >
                                     {stripeStatusFetching ? (
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -180,7 +182,7 @@ export default function PaymentsPage({
                                     )}
                                     Sync
                                 </Button>
-                                {hasStripeAccount && (
+                                {hasStripeAccount && canAccessPayments && (
                                     <Button
                                         size="sm"
                                         onClick={() => {
@@ -201,50 +203,39 @@ export default function PaymentsPage({
                 <div className="mx-auto w-full max-w-7xl space-y-8">
                     {isInitialLoading ? <PaymentsContentSkeleton /> : null}
 
-                    {!isInitialLoading && store && !isOwner ? (
-                        <Card className="max-w-2xl border-amber-500/20 bg-amber-500/5">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-amber-700 font-semibold">
-                                    <ShieldAlert className="h-5 w-5" />
-                                    Restricted Access
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm text-amber-700/80 mb-4">
-                                    Only store owners can manage payment and tax settings.
-                                </p>
-                                <Link href={`/dashboard/${storeId}`}>
-                                    <Button variant="outline">Return to Dashboard</Button>
-                                </Link>
-                            </CardContent>
-                        </Card>
+                    {!isInitialLoading && store && !canAccessPayments ? (
+                        <NotAllowedState
+                            title="Payments access denied"
+                            message="Only store owners can manage payment and tax settings."
+                            returnHref={`/dashboard/${storeId}`}
+                        />
                     ) : null}
 
-                    {!isInitialLoading && store && isOwner ? (
+                    {!isInitialLoading && store && canAccessPayments ? (
                         <div className="grid gap-8 lg:grid-cols-12">
                             {/* Status Overview Grid */}
                             <div className="lg:col-span-12 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-                                <StatusCard 
-                                    title="Account" 
-                                    status={hasStripeAccount ? "Linked" : "Not Linked"} 
+                                <StatusCard
+                                    title="Account"
+                                    status={hasStripeAccount ? "Linked" : "Not Linked"}
                                     icon={<Landmark className="h-4 w-4" />}
                                     variant={hasStripeAccount ? "success" : "warning"}
                                 />
-                                <StatusCard 
-                                    title="Payments" 
-                                    status={isConnected ? "Enabled" : "Disabled"} 
+                                <StatusCard
+                                    title="Payments"
+                                    status={isConnected ? "Enabled" : "Disabled"}
                                     icon={<CreditCard className="h-4 w-4" />}
                                     variant={isConnected ? "success" : "warning"}
                                 />
-                                <StatusCard 
-                                    title="Payouts" 
-                                    status={stripeStatus?.payouts_enabled ? "Enabled" : "Pending"} 
+                                <StatusCard
+                                    title="Payouts"
+                                    status={stripeStatus?.payouts_enabled ? "Enabled" : "Pending"}
                                     icon={<Banknote className="h-4 w-4" />}
                                     variant={stripeStatus?.payouts_enabled ? "success" : "warning"}
                                 />
-                                 <StatusCard 
-                                    title="Tax Service" 
-                                    status={stripeStatus?.tax_settings?.status === "active" ? "Active" : "Not Ready"} 
+                                <StatusCard
+                                    title="Tax Service"
+                                    status={stripeStatus?.tax_settings?.status === "active" ? "Active" : "Not Ready"}
                                     icon={<Globe className="h-4 w-4" />}
                                     variant={stripeStatus?.tax_settings?.status === "active" ? "success" : "warning"}
                                 />
@@ -306,19 +297,19 @@ export default function PaymentsPage({
                                     </CardHeader>
                                     <CardContent className="p-6 space-y-6">
                                         <div className="grid gap-4 sm:grid-cols-2">
-                                            <InfoBox 
-                                                title="Identity Verification" 
+                                            <InfoBox
+                                                title="Identity Verification"
                                                 active={!!stripeStatus?.details_submitted}
-                                                description={stripeStatus?.details_submitted 
-                                                    ? "Business details verified." 
+                                                description={stripeStatus?.details_submitted
+                                                    ? "Business details verified."
                                                     : "Details submission required."}
                                                 icon={<ShieldCheck className="h-4 w-4" />}
                                             />
-                                            <InfoBox 
-                                                title="Card Capability" 
+                                            <InfoBox
+                                                title="Card Capability"
                                                 active={stripeStatus?.capabilities?.card_payments === "active"}
-                                                description={stripeStatus?.capabilities?.card_payments === "active" 
-                                                    ? "Active and ready." 
+                                                description={stripeStatus?.capabilities?.card_payments === "active"
+                                                    ? "Active and ready."
                                                     : "Capability is pending."}
                                                 icon={<Wallet className="h-4 w-4" />}
                                             />
@@ -333,7 +324,7 @@ export default function PaymentsPage({
                                                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                                                     {currentlyDue.map((field) => (
                                                         <li key={field} className="text-[11px] text-amber-700/80 flex items-center gap-2 capitalize">
-                                                            <div className="h-1 w-1 rounded-full bg-amber-500 flex-shrink-0" />
+                                                            <div className="h-1 w-1 rounded-full bg-amber-500 shrink-0" />
                                                             {field.replace(/_/g, " ")}
                                                         </li>
                                                     ))}
@@ -352,8 +343,8 @@ export default function PaymentsPage({
                                                         You need to link a Stripe account to start receiving money from your customers.
                                                     </p>
                                                 </div>
-                                                <Button 
-                                                    onClick={() => onboardMutation.mutate()} 
+                                                <Button
+                                                    onClick={() => onboardMutation.mutate()}
                                                     disabled={onboardMutation.isPending}
                                                     className="px-8 font-semibold transition-all hover:scale-105"
                                                 >
@@ -389,19 +380,19 @@ export default function PaymentsPage({
                                     </CardHeader>
                                     <CardContent className="p-6 space-y-6">
                                         <div className="grid gap-4 sm:grid-cols-2">
-                                            <InfoBox 
-                                                title="Business Headquarters" 
+                                            <InfoBox
+                                                title="Business Headquarters"
                                                 active={!!stripeStatus?.tax_settings?.headquarters}
-                                                description={stripeStatus?.tax_settings?.headquarters 
-                                                    ? "Headquarters address set." 
+                                                description={stripeStatus?.tax_settings?.headquarters
+                                                    ? "Headquarters address set."
                                                     : "Origin address missing."}
                                                 icon={<MapPin className="h-4 w-4" />}
                                             />
-                                            <InfoBox 
-                                                title="Tax Registrations" 
+                                            <InfoBox
+                                                title="Tax Registrations"
                                                 active={stripeStatus?.tax_settings?.status === "active"}
-                                                description={stripeStatus?.tax_settings?.status === "active" 
-                                                    ? "Ready to collect tax." 
+                                                description={stripeStatus?.tax_settings?.status === "active"
+                                                    ? "Ready to collect tax."
                                                     : "No active registrations."}
                                                 icon={<CheckCircle2 className="h-4 w-4" />}
                                             />
@@ -414,11 +405,11 @@ export default function PaymentsPage({
                                                     Setup Required
                                                 </p>
                                                 <p className="text-xs leading-relaxed opacity-90">
-                                                    To enable automatic tax calculation, you must register 
+                                                    To enable automatic tax calculation, you must register
                                                     for tax in your Stripe Dashboard and configure your business headquarters address.
                                                 </p>
-                                                <Button 
-                                                    variant="link" 
+                                                <Button
+                                                    variant="link"
                                                     className="p-0 h-auto text-xs font-bold text-blue-600 mt-2 hover:no-underline"
                                                     onClick={() => window.open("https://dashboard.stripe.com/tax", "_blank")}
                                                 >

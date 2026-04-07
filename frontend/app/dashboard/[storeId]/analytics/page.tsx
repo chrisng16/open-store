@@ -1,8 +1,10 @@
 "use client";
 
 import StoreSubNav from "@/app/dashboard/_components/store-sub-nav";
+import { NotAllowedState } from "@/components/dashboard/common/not-allowed-state";
 import { Card, CardContent } from "@/components/ui/card";
-import { fetchWithAccessToken } from "@/lib/auth-fetch";
+import { useStoreCapabilities } from "@/hooks/use-store-capabilities";
+import { AuthFetchError, fetchWithAccessToken } from "@/lib/auth-fetch";
 import type { PaginatedResponse } from "@/lib/pagination";
 import { useQuery } from "@tanstack/react-query";
 import { CircleDollarSign, Clock3, ReceiptText, ShoppingBag } from "lucide-react";
@@ -136,6 +138,7 @@ function MetricsGrid({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 function AnalyticsDashboard({ storeId }: { storeId: string }) {
+    const capabilities = useStoreCapabilities(storeId);
     const storeQuery = useQuery({
         queryKey: ["store", storeId],
         queryFn: () => fetchWithAccessToken<Store>(`/stores/${storeId}`),
@@ -152,6 +155,21 @@ function AnalyticsDashboard({ storeId }: { storeId: string }) {
     const metrics = computeMetrics(orders);
     const currency = orders[0]?.currency ?? "USD";
     const decimalPlaces = orders[0]?.decimalPlaces ?? 2;
+
+    const isForbidden =
+        !capabilities.isLoading &&
+        (!capabilities.canViewAnalytics ||
+            (ordersQuery.error instanceof AuthFetchError && ordersQuery.error.status === 403));
+
+    if (isForbidden) {
+        return (
+            <NotAllowedState
+                title="Analytics access denied"
+                message="You do not have permission to view analytics for this store."
+                returnHref={`/dashboard/${storeId}`}
+            />
+        );
+    }
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">

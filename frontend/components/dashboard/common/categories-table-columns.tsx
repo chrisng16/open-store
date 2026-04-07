@@ -27,11 +27,13 @@ export type CategoryRow = {
 function StatusToggle({
     isActive,
     onToggle,
-    disabled = false
+    disabled = false,
+    disabledReason,
 }: {
     isActive: boolean;
     onToggle: (val: boolean) => Promise<void>;
     disabled?: boolean;
+    disabledReason?: string;
 }) {
     const [isUpdating, setIsUpdating] = useState(false);
 
@@ -78,7 +80,11 @@ function StatusToggle({
                 </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="text-[11px] font-medium px-2 py-1">
-                {isActive ? "Click to hide from customers" : "Click to make visible to customers"}
+                {disabled && disabledReason
+                    ? disabledReason
+                    : isActive
+                        ? "Click to hide from customers"
+                        : "Click to make visible to customers"}
             </TooltipContent>
         </Tooltip>
     );
@@ -88,12 +94,24 @@ type CategoryColumnsParams = {
     onEdit: (category: CategoryRow) => void;
     onDelete: (category: CategoryRow) => void;
     onStatusToggle: (category: CategoryRow, isActive: boolean) => Promise<void>;
+    canEdit: boolean;
+    canDelete: boolean;
+    canToggleStatus: boolean;
+    editDisabledReason?: string;
+    deleteDisabledReason?: string;
+    statusDisabledReason?: string;
 };
 
 export function getCategoriesTableColumns({
     onEdit,
     onDelete,
     onStatusToggle,
+    canEdit,
+    canDelete,
+    canToggleStatus,
+    editDisabledReason,
+    deleteDisabledReason,
+    statusDisabledReason,
 }: CategoryColumnsParams): ColumnDef<CategoryRow>[] {
     return [
         {
@@ -127,6 +145,8 @@ export function getCategoriesTableColumns({
                 <div className="text-left">
                     <StatusToggle
                         isActive={row.original.isActive}
+                        disabled={!canToggleStatus}
+                        disabledReason={statusDisabledReason}
                         onToggle={(val) => onStatusToggle(row.original, val)}
                     />
                 </div>
@@ -146,19 +166,31 @@ export function getCategoriesTableColumns({
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-30">
-                            <DropdownMenuItem
-                                key="edit"
-                                onSelect={() => onEdit(row.original)}
-                            >
-                                <Pencil className="h-4 w-4" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                key="delete"
-                                onSelect={() => onDelete(row.original)}
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <Trash2 className="h-4 w-4 text-destructive" /> Delete
-                            </DropdownMenuItem>
+                            {canEdit ? (
+                                <DropdownMenuItem
+                                    key="edit"
+                                    onSelect={() => onEdit(row.original)}
+                                >
+                                    <Pencil className="h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                            ) : (
+                                <DropdownMenuItem disabled key="edit-disabled">
+                                    <Pencil className="h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                            )}
+                            {canDelete ? (
+                                <DropdownMenuItem
+                                    key="delete"
+                                    onSelect={() => onDelete(row.original)}
+                                    className="text-destructive focus:text-destructive"
+                                >
+                                    <Trash2 className="h-4 w-4 text-destructive" /> Delete
+                                </DropdownMenuItem>
+                            ) : (
+                                <DropdownMenuItem disabled key="delete-disabled">
+                                    <Trash2 className="h-4 w-4" /> Delete
+                                </DropdownMenuItem>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

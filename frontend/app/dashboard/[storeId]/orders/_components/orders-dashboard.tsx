@@ -2,6 +2,7 @@
 
 import { DataTable } from "@/components/dashboard/common/data-table";
 import { DataTableColumnHeader } from "@/components/dashboard/common/data-table-column-header";
+import { NotAllowedState } from "@/components/dashboard/common/not-allowed-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -31,7 +32,8 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { fetchWithAccessToken } from "@/lib/auth-fetch";
+import { useStoreCapabilities } from "@/hooks/use-store-capabilities";
+import { AuthFetchError, fetchWithAccessToken } from "@/lib/auth-fetch";
 import { buildListQueryKey, useListFilters, type ListFilterConfig } from "@/lib/list-filters";
 import { denormalizeRequest } from "@/lib/normalize-response";
 import {
@@ -1042,6 +1044,7 @@ function OrdersSubNav({
 }
 
 export function OrdersDashboard({ storeId }: { storeId: string }) {
+    const capabilities = useStoreCapabilities(storeId);
     const queryClient = useQueryClient();
     const { filters, updateFilters, toApiParams, toQueryShape } = useListFilters(ordersFiltersConfig);
     const debouncedSearchQuery = useDebouncedValue(filters.q, 250);
@@ -1213,6 +1216,21 @@ export function OrdersDashboard({ storeId }: { storeId: string }) {
 
     const hasNonDefaultFilters =
         filters.range !== DEFAULT_RANGE || filters.statuses.length > 0 || filters.q.length > 0;
+
+    const isForbidden =
+        !capabilities.isLoading &&
+        (!capabilities.canViewOrders ||
+            (ordersQuery.error instanceof AuthFetchError && ordersQuery.error.status === 403));
+
+    if (isForbidden) {
+        return (
+            <NotAllowedState
+                title="Orders access denied"
+                message="You do not have permission to view store orders."
+                returnHref={`/dashboard/${storeId}`}
+            />
+        );
+    }
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
